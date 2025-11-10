@@ -13,8 +13,8 @@ A command-line interface for interacting with the Xero API, modeled after the Gi
 
 ## Prerequisites
 
-- Elixir 1.14 or higher
-- Erlang/OTP 25 or higher
+- Elixir 1.18 or higher (for built-in JSON support)
+- Erlang/OTP 27 or higher
 - A Xero developer account and OAuth 2.0 application
 
 ## Installation
