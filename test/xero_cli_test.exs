@@ -2,7 +2,9 @@ defmodule XeroCLITest do
   use ExUnit.Case
   doctest XeroCLI
 
-  test "greets the world" do
-    assert XeroCLI.hello() == :world
+  describe "version/0" do
+    test "returns version string" do
+      assert XeroCLI.version() == "0.1.0"
+    end
   end
 end

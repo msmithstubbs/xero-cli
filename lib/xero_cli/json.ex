@@ -83,16 +83,16 @@ defmodule Jason do
   # Manual decoding fallback (basic implementation)
   defp manual_decode(json) do
     try do
-      result = do_parse(String.trim(json))
+      {result, _rest} = do_parse(String.trim(json))
       {:ok, result}
     rescue
       e -> {:error, "Parse error: #{inspect(e)}"}
     end
   end
 
-  defp do_parse("null" <> _), do: nil
-  defp do_parse("true" <> _), do: true
-  defp do_parse("false" <> _), do: false
+  defp do_parse("null" <> rest), do: {nil, rest}
+  defp do_parse("true" <> rest), do: {true, rest}
+  defp do_parse("false" <> rest), do: {false, rest}
 
   defp do_parse("{" <> rest) do
     parse_object(rest, %{})
@@ -109,7 +109,7 @@ defmodule Jason do
   defp do_parse(json) do
     # Try to parse as number
     case Float.parse(json) do
-      {num, _} -> num
+      {num, rest} -> {num, rest}
       :error -> raise "Invalid JSON"
     end
   end
