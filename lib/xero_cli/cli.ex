@@ -18,6 +18,9 @@ defmodule XeroCLI.CLI do
       {:accounts, subcommand, opts} ->
         XeroCLI.Commands.Accounts.handle(subcommand, opts)
 
+      {:currencies, subcommand, opts} ->
+        XeroCLI.Commands.Currencies.handle(subcommand, opts)
+
       {:help} ->
         print_help()
 
@@ -76,6 +79,15 @@ defmodule XeroCLI.CLI do
     end
   end
 
+  defp parse_args(["currencies" | rest]) do
+    case rest do
+      ["list" | opts] -> {:currencies, :list, opts}
+      ["get" | opts] -> {:currencies, :get, opts}
+      [] -> {:error, "currencies command requires a subcommand"}
+      [unknown | _] -> {:error, "unknown currencies subcommand: #{unknown}"}
+    end
+  end
+
   defp parse_args([unknown | _]) do
     {:error, "unknown command: #{unknown}"}
   end
@@ -88,10 +100,11 @@ defmodule XeroCLI.CLI do
       xero <command> <subcommand> [flags]
 
     CORE COMMANDS:
-      auth        Authenticate with Xero
-      invoices    Manage invoices
-      contacts    Manage contacts
-      accounts    Manage accounts
+      auth         Authenticate with Xero
+      invoices     Manage invoices
+      contacts     Manage contacts
+      accounts     Manage accounts
+      currencies   Manage currencies
 
     AUTH COMMANDS:
       xero auth login     Log in to Xero via OAuth 2.0
@@ -109,6 +122,10 @@ defmodule XeroCLI.CLI do
       xero accounts list           List all accounts
       xero accounts get <id>       Get a single account by ID
 
+    CURRENCY COMMANDS:
+      xero currencies list         List all currencies
+      xero currencies get <code>   Get a single currency by code (e.g., USD, EUR)
+
     FLAGS:
       --help, -h       Show help for command
       --page <num>     Page number for pagination (default: 1)
@@ -121,6 +138,8 @@ defmodule XeroCLI.CLI do
       $ xero contacts get abc123-def456-ghi789
       $ xero accounts list
       $ xero accounts get xyz789-uvw456-rst123
+      $ xero currencies list
+      $ xero currencies get USD
 
     Learn more at: https://developer.xero.com/
     """)
