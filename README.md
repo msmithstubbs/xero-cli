@@ -9,12 +9,11 @@ A command-line interface for interacting with the Xero API, modeled after the Gi
 - **Secure Credential Storage** - Credentials stored locally with proper permissions
 - **Invoice Management** - List, filter, and manage invoices
 - **Clean CLI Interface** - Inspired by GitHub CLI's user-friendly design
-- **No External Dependencies** - Uses Erlang's built-in HTTP client and SSL
+- **No External Runtime Dependencies** - Uses Go's standard library
 
 ## Prerequisites
 
-- Elixir 1.18 or higher (for built-in JSON support)
-- Erlang/OTP 27 or higher
+- Go 1.22 or higher
 - A Xero developer account and OAuth 2.0 application
 
 ## Installation
@@ -24,8 +23,7 @@ A command-line interface for interacting with the Xero API, modeled after the Gi
 ```bash
 git clone <repository-url>
 cd xero-cli
-mix deps.get
-mix escript.build
+go build -o xero ./cmd/xero
 ```
 
 This will create an executable file named `xero` in the current directory.
@@ -71,7 +69,7 @@ You'll be asked to:
 2. Authorize the application in your browser
 3. The CLI will automatically capture the OAuth callback
 
-Your credentials will be securely stored in `~/.xero-cli/config.json` with restricted file permissions (600).
+Your credentials will be securely stored in `~/.xero-cli/config.toml` with restricted file permissions (600).
 
 ## Usage
 
@@ -137,20 +135,20 @@ xero invoices list --page 2 --page-size 50
 ```bash
 # 1. Authenticate
 $ xero auth login
-🔐 Xero CLI - OAuth 2.0 Authentication
+Xero CLI - OAuth 2.0 Authentication
 
 Enter your Xero Client ID: YOUR_CLIENT_ID_HERE
 Please visit the following URL to authorize this application:
   https://login.xero.com/identity/connect/authorize?...
 
-✓ Browser opened automatically
-📡 Waiting for OAuth callback on http://localhost:8888/callback...
-✓ Authorization code received
+Browser opened automatically
+Waiting for OAuth callback on http://localhost:8888/callback...
+Authorization code received
 Exchanging code for access token...
-✓ Access token obtained
+Access token obtained
 Fetching Xero organizations...
 
-✅ Successfully authenticated with Xero!
+Successfully authenticated with Xero!
 Organization: My Company Ltd
 Tenant ID: abc123-def456-...
 
@@ -158,23 +156,23 @@ You can now use the Xero CLI.
 
 # 2. Check status
 $ xero auth status
-✅ Authenticated
+Authenticated
 Organization: My Company Ltd
 Tenant ID: abc123-def456-...
-✓ Access token is valid
+Access token is valid
 
 # 3. List invoices
 $ xero invoices list
-📄 Fetching invoices...
+Fetching invoices...
 
 Found 15 invoice(s):
 
 ========================================================================================================================
 Invoice Number       | Type       | Contact                   | Date         | Due Date     | Status       | Total
 ========================================================================================================================
-INV-001             | ACCREC     | Acme Corp                 | 2025-01-15   | 2025-02-14   | ✓ PAID      | $1,250.00
-INV-002             | ACCREC     | Widget Industries         | 2025-01-20   | 2025-02-19   | ○ AUTH      | $3,450.00
-INV-003             | ACCREC     | Tech Solutions LLC        | 2025-01-25   | 2025-02-24   | ◐ DRAFT     | $890.50
+INV-001             | ACCREC     | Acme Corp                 | 2025-01-15   | 2025-02-14   | PAID       | $1,250.00
+INV-002             | ACCREC     | Widget Industries         | 2025-01-20   | 2025-02-19   | AUTH       | $3,450.00
+INV-003             | ACCREC     | Tech Solutions LLC        | 2025-01-25   | 2025-02-24   | DRAFT      | $890.50
 ========================================================================================================================
 
 # 4. Filter invoices
@@ -183,7 +181,8 @@ $ xero invoices list --status AUTHORISED
 
 ## Configuration
 
-Configuration and credentials are stored in `~/.xero-cli/config.json`.
+Configuration and credentials are stored in `~/.xero-cli/config.toml`.
+If an existing `~/.xero-cli/config.json` is found, it will be migrated on first run.
 
 You can also set your Client ID as an environment variable:
 
@@ -196,19 +195,16 @@ xero auth login
 
 ```
 xero-cli/
-├── lib/
-│   ├── xero_cli/
-│   │   ├── cli.ex              # Main CLI entry point and command router
-│   │   ├── config.ex           # Configuration and credential management
-│   │   ├── http.ex             # HTTP client wrapper (uses :httpc)
-│   │   ├── json.ex             # JSON encoder/decoder
-│   │   ├── oauth.ex            # OAuth 2.0 flow implementation
-│   │   └── commands/
-│   │       ├── auth.ex         # Authentication commands
-│   │       └── invoices.ex     # Invoice management commands
-│   └── xero_cli.ex             # Main module
-├── mix.exs                      # Project configuration
-└── README.md                    # This file
+|-- cmd/
+|   `-- xero/                    # Cobra CLI entry point
+|-- internal/
+|   |-- auth/                    # Token validation + refresh
+|   |-- config/                  # TOML config + migration
+|   |-- oauth/                   # OAuth 2.0 flow
+|   |-- ui/                      # Output formatting helpers
+|   `-- xero/                    # HTTP client wrapper
+|-- go.mod
+`-- README.md
 ```
 
 ## Architecture
@@ -231,24 +227,19 @@ xero-cli/
 
 ## Development
 
-### Compile the Project
+### Build Executable
 ```bash
-mix compile
+go build -o xero ./cmd/xero
 ```
 
 ### Run Tests
 ```bash
-mix test
-```
-
-### Build Executable
-```bash
-mix escript.build
+go test ./...
 ```
 
 ### Run Locally Without Building
 ```bash
-mix run -e 'XeroCLI.CLI.main(["--help"])'
+go run ./cmd/xero --help
 ```
 
 ## Troubleshooting
