@@ -1,0 +1,221 @@
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/url"
+	"strings"
+
+	"github.com/msmithstubbs/xero-cli/internal/auth"
+	"github.com/msmithstubbs/xero-cli/internal/ui"
+	"github.com/msmithstubbs/xero-cli/internal/xero"
+	"github.com/spf13/cobra"
+)
+
+const xeroAPIBase = "https://api.xero.com/api.xro/2.0"
+
+var contactsCmd = &cobra.Command{
+	Use:   "contacts",
+	Short: "Manage contacts",
+}
+
+var contactsListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all contacts",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		creds, err := auth.GetValidCredentials()
+		if err != nil {
+			return err
+		}
+
+		page, _ := cmd.Flags().GetInt("page")
+		pageSize, _ := cmd.Flags().GetInt("page-size")
+
+		params := url.Values{}
+		if page > 0 {
+			params.Set("page", fmt.Sprintf("%d", page))
+		}
+		if pageSize > 0 {
+			params.Set("pageSize", fmt.Sprintf("%d", pageSize))
+		}
+		endpoint := fmt.Sprintf("%s/Contacts?%s", xeroAPIBase, params.Encode())
+
+		fmt.Println("Fetching contacts...")
+		fmt.Println()
+
+		client := xero.NewClient(xeroAPIBase)
+		status, body, err := client.Do("GET", endpoint, authHeaders(creds), nil)
+		if err != nil {
+			return err
+		}
+
+		if status == 401 {
+			return errors.New("authentication failed. Please run 'xero auth login' again")
+		}
+		if status < 200 || status >= 300 {
+			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
+		}
+
+		var payload map[string]any
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return fmt.Errorf("failed to parse response: %w", err)
+		}
+
+		contacts := getArray(payload, "Contacts")
+		displayContacts(contacts)
+		return nil
+	},
+}
+
+var contactsGetCmd = &cobra.Command{
+	Use:   "get <contact_id>",
+	Short: "Get a single contact by ID",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		contactID := args[0]
+		creds, err := auth.GetValidCredentials()
+		if err != nil {
+			return err
+		}
+
+		endpoint := fmt.Sprintf("%s/Contacts/%s", xeroAPIBase, contactID)
+		fmt.Printf("Fetching contact %s...\n\n", contactID)
+
+		client := xero.NewClient(xeroAPIBase)
+		status, body, err := client.Do("GET", endpoint, authHeaders(creds), nil)
+		if err != nil {
+			return err
+		}
+
+		switch status {
+		case 200:
+			var payload map[string]any
+			if err := json.Unmarshal(body, &payload); err != nil {
+				return fmt.Errorf("failed to parse response: %w", err)
+			}
+			contacts := getArray(payload, "Contacts")
+			if len(contacts) == 0 {
+				fmt.Println("Contact not found.")
+				return nil
+			}
+			if contact, ok := contacts[0].(map[string]any); ok {
+				displayContactDetail(contact)
+				return nil
+			}
+			return errors.New("unexpected response format")
+		case 401:
+			return errors.New("authentication failed. Please run 'xero auth login' again")
+		case 404:
+			return errors.New("contact not found")
+		default:
+			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
+		}
+	},
+}
+
+func init() {
+	contactsCmd.AddCommand(contactsListCmd)
+	contactsCmd.AddCommand(contactsGetCmd)
+	contactsListCmd.Flags().Int("page", 1, "Page number for pagination")
+	contactsListCmd.Flags().Int("page-size", 100, "Number of items per page")
+}
+
+func displayContacts(items []any) {
+	if len(items) == 0 {
+		fmt.Println("No contacts found.")
+		return
+	}
+
+	fmt.Printf("Found %d contact(s):\n", len(items))
+	fmt.Println()
+	ui.PrintHeaderLine(120)
+	header := ui.FormatRow(
+		ui.Pad("Name", 30),
+		ui.Pad("Email", 35),
+		ui.Pad("Contact ID", 38),
+		ui.Pad("Status", 15),
+	)
+	fmt.Println(header)
+	ui.PrintHeaderLine(120)
+
+	for _, item := range items {
+		contact, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		name := stringValue(contact, "Name", "N/A")
+		email := stringValue(contact, "EmailAddress", "N/A")
+		contactID := stringValue(contact, "ContactID", "N/A")
+		status := stringValue(contact, "ContactStatus", "N/A")
+
+		row := ui.FormatRow(
+			ui.Pad(name, 30),
+			ui.Pad(email, 35),
+			ui.Pad(contactID, 38),
+			ui.Pad(status, 15),
+		)
+		fmt.Println(row)
+	}
+
+	ui.PrintHeaderLine(120)
+}
+
+func displayContactDetail(contact map[string]any) {
+	fmt.Println("Contact Details:")
+	fmt.Println()
+	ui.PrintHeaderLine(80)
+
+	fmt.Printf("Name:             %s\n", stringValue(contact, "Name", "N/A"))
+	fmt.Printf("First Name:       %s\n", stringValue(contact, "FirstName", "N/A"))
+	fmt.Printf("Last Name:        %s\n", stringValue(contact, "LastName", "N/A"))
+	fmt.Printf("Contact ID:       %s\n", stringValue(contact, "ContactID", "N/A"))
+	fmt.Printf("Email:            %s\n", stringValue(contact, "EmailAddress", "N/A"))
+	fmt.Printf("Status:           %s\n", stringValue(contact, "ContactStatus", "N/A"))
+
+	addresses := getArray(contact, "Addresses")
+	if len(addresses) > 0 {
+		fmt.Println("\nAddresses:")
+		for _, addressItem := range addresses {
+			address, ok := addressItem.(map[string]any)
+			if !ok {
+				continue
+			}
+			addrType := stringValue(address, "AddressType", "N/A")
+			line1 := stringValue(address, "AddressLine1", "")
+			line2 := stringValue(address, "AddressLine2", "")
+			city := stringValue(address, "City", "")
+			region := stringValue(address, "Region", "")
+			postal := stringValue(address, "PostalCode", "")
+			country := stringValue(address, "Country", "")
+
+			fmt.Printf("  %s:\n", addrType)
+			if line1 != "" {
+				fmt.Printf("    %s\n", line1)
+			}
+			if line2 != "" {
+				fmt.Printf("    %s\n", line2)
+			}
+			location := strings.TrimSpace(strings.Join(filterEmpty([]string{city, region, postal, country}), ", "))
+			if location != "" {
+				fmt.Printf("    %s\n", location)
+			}
+		}
+	}
+
+	phones := getArray(contact, "Phones")
+	if len(phones) > 0 {
+		fmt.Println("\nPhones:")
+		for _, phoneItem := range phones {
+			phone, ok := phoneItem.(map[string]any)
+			if !ok {
+				continue
+			}
+			typeValue := stringValue(phone, "PhoneType", "N/A")
+			number := stringValue(phone, "PhoneNumber", "N/A")
+			fmt.Printf("  %s: %s\n", typeValue, number)
+		}
+	}
+
+	ui.PrintHeaderLine(80)
+}

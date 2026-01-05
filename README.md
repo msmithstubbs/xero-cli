@@ -8,6 +8,7 @@ A command-line interface for interacting with the Xero API, modeled after the Gi
 - **Automatic Token Refresh** - No need to re-authenticate frequently
 - **Secure Credential Storage** - Credentials stored locally with proper permissions
 - **Invoice Management** - List, filter, and manage invoices
+- **Bank Transactions** - Create spend/receive money transactions
 - **Clean CLI Interface** - Inspired by GitHub CLI's user-friendly design
 - **No External Runtime Dependencies** - Uses Go's standard library
 
@@ -124,6 +125,44 @@ xero invoices list --status DRAFT
 #### Pagination
 ```bash
 xero invoices list --page 2 --page-size 50
+```
+
+---
+
+### Bank Transaction Commands
+
+#### Create Bank Transactions
+```bash
+xero banktransactions create --file banktransactions.json
+```
+
+Optional flags:
+```bash
+--summarize-errors   Summarize validation errors in the response
+--unitdp <int>       Unit decimal places for line items
+--idempotency-key    Idempotency key for safe retries
+```
+
+Example `banktransactions.json`:
+```json
+{
+  "BankTransactions": [
+    {
+      "Type": "SPEND",
+      "Contact": { "Name": "Acme Corp" },
+      "Date": "2025-01-15",
+      "LineAmountTypes": "Exclusive",
+      "LineItems": [
+        {
+          "Description": "Office supplies",
+          "Quantity": 1,
+          "UnitAmount": 120.00,
+          "AccountCode": "400"
+        }
+      ]
+    }
+  ]
+}
 ```
 
 ---
