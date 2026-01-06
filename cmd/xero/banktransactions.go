@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -127,7 +128,7 @@ func buildBankTransactionsPayload(path string) ([]byte, error) {
 }
 
 func prettyJSON(input []byte) (string, error) {
-	var out strings.Builder
+	var out bytes.Buffer
 	if err := json.Indent(&out, input, "", "  "); err != nil {
 		return "", err
 	}
