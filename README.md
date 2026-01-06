@@ -165,6 +165,16 @@ Example `banktransactions.json`:
 }
 ```
 
+#### Convert Flex CSV (Interactive Brokers)
+```bash
+scripts/convert_flex_csv.py /path/to/flex.csv \
+  --contact "Interactive Brokers" \
+  --account-code 400 \
+  --bank-account-code 090 \
+  --pretty \
+  | xero banktransactions create --file -
+```
+
 ---
 
 ## Examples
