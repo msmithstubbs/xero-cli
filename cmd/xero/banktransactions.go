@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"strings"
@@ -92,7 +93,13 @@ func init() {
 }
 
 func buildBankTransactionsPayload(path string) ([]byte, error) {
-	data, err := os.ReadFile(path)
+	var data []byte
+	var err error
+	if path == "-" {
+		data, err = io.ReadAll(os.Stdin)
+	} else {
+		data, err = os.ReadFile(path)
+	}
 	if err != nil {
 		return nil, err
 	}
