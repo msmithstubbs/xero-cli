@@ -1,2 +1,5 @@
 [tools]
 go = "1.23"
+
+[tasks.build]
+run = "go build ./cmd/xero"
