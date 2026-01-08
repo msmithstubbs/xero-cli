@@ -15,13 +15,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var bankTransactionsCmd = &cobra.Command{
-	Use:   "banktransactions",
-	Short: "Manage bank transactions",
+var bankingCmd = &cobra.Command{
+	Use:   "banking",
+	Short: "Manage banking operations",
 }
 
-var bankTransactionsCreateCmd = &cobra.Command{
-	Use:   "create",
+var bankingTransactionsCmd = &cobra.Command{
+	Use:   "transactions",
 	Short: "Create bank transactions",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		creds, err := auth.GetValidCredentials()
@@ -86,11 +86,11 @@ var bankTransactionsCreateCmd = &cobra.Command{
 }
 
 func init() {
-	bankTransactionsCmd.AddCommand(bankTransactionsCreateCmd)
-	bankTransactionsCreateCmd.Flags().String("file", "", "Path to JSON file containing bank transactions")
-	bankTransactionsCreateCmd.Flags().Bool("summarize-errors", false, "Summarize validation errors in the response")
-	bankTransactionsCreateCmd.Flags().Int("unitdp", 0, "Unit decimal places for line items")
-	bankTransactionsCreateCmd.Flags().String("idempotency-key", "", "Idempotency key for safe retries")
+	bankingCmd.AddCommand(bankingTransactionsCmd)
+	bankingTransactionsCmd.Flags().String("file", "", "Path to JSON file containing bank transactions")
+	bankingTransactionsCmd.Flags().Bool("summarize-errors", false, "Summarize validation errors in the response")
+	bankingTransactionsCmd.Flags().Int("unitdp", 0, "Unit decimal places for line items")
+	bankingTransactionsCmd.Flags().String("idempotency-key", "", "Idempotency key for safe retries")
 }
 
 func buildBankTransactionsPayload(path string) ([]byte, error) {
