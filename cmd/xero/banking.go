@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/msmithstubbs/xero-cli/internal/auth"
+	"github.com/msmithstubbs/xero-cli/internal/ui"
 	"github.com/msmithstubbs/xero-cli/internal/xero"
 	"github.com/spf13/cobra"
 )
@@ -85,12 +86,61 @@ var bankingTransactionsCmd = &cobra.Command{
 	},
 }
 
+var bankingListAccountsCmd = &cobra.Command{
+	Use:   "list-accounts",
+	Short: "List bank accounts",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		creds, err := auth.GetValidCredentials()
+		if err != nil {
+			return err
+		}
+
+		params := url.Values{}
+		params.Set("where", "Type==\"BANK\"")
+		endpoint := fmt.Sprintf("%s/Accounts?%s", xeroAPIBase, params.Encode())
+
+		fmt.Println("Fetching bank accounts...")
+		fmt.Println()
+
+		headers := authHeaders(creds)
+		if cmd.Flags().Changed("tenant-id") {
+			if tenantID, _ := cmd.Flags().GetString("tenant-id"); strings.TrimSpace(tenantID) != "" {
+				headers["xero-tenant-id"] = strings.TrimSpace(tenantID)
+			}
+		}
+
+		client := xero.NewClient(xeroAPIBase)
+		status, body, err := client.Do("GET", endpoint, headers, nil)
+		if err != nil {
+			return err
+		}
+
+		if status == 401 {
+			return errors.New("authentication failed. Please run 'xero auth login' again")
+		}
+		if status < 200 || status >= 300 {
+			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
+		}
+
+		var payload map[string]any
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return fmt.Errorf("failed to parse response: %w", err)
+		}
+
+		accounts := getArray(payload, "Accounts")
+		displayBankAccounts(accounts)
+		return nil
+	},
+}
+
 func init() {
 	bankingCmd.AddCommand(bankingTransactionsCmd)
+	bankingCmd.AddCommand(bankingListAccountsCmd)
 	bankingTransactionsCmd.Flags().String("file", "", "Path to JSON file containing bank transactions")
 	bankingTransactionsCmd.Flags().Bool("summarize-errors", false, "Summarize validation errors in the response")
 	bankingTransactionsCmd.Flags().Int("unitdp", 0, "Unit decimal places for line items")
 	bankingTransactionsCmd.Flags().String("idempotency-key", "", "Idempotency key for safe retries")
+	bankingListAccountsCmd.Flags().String("tenant-id", "", "Tenant ID to use for this request")
 }
 
 func buildBankTransactionsPayload(path string) ([]byte, error) {
@@ -138,4 +188,44 @@ func prettyJSON(input []byte) (string, error) {
 func hasKey(m map[string]any, key string) bool {
 	_, ok := m[key]
 	return ok
+}
+
+func displayBankAccounts(items []any) {
+	filtered := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		account, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if strings.EqualFold(stringValue(account, "Type", ""), "BANK") {
+			filtered = append(filtered, account)
+		}
+	}
+
+	if len(filtered) == 0 {
+		fmt.Println("No bank accounts found.")
+		return
+	}
+
+	fmt.Printf("Found %d bank account(s):\n", len(filtered))
+	fmt.Println()
+	ui.PrintHeaderLine(90)
+	header := ui.FormatRow(
+		ui.Pad("Name", 45),
+		ui.Pad("Account ID", 40),
+	)
+	fmt.Println(header)
+	ui.PrintHeaderLine(90)
+
+	for _, account := range filtered {
+		name := stringValue(account, "Name", "N/A")
+		accountID := stringValue(account, "AccountID", "N/A")
+		row := ui.FormatRow(
+			ui.Pad(name, 45),
+			ui.Pad(accountID, 40),
+		)
+		fmt.Println(row)
+	}
+
+	ui.PrintHeaderLine(90)
 }
