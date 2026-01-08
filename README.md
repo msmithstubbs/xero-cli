@@ -8,7 +8,7 @@ A command-line interface for interacting with the Xero API, modeled after the Gi
 - **Automatic Token Refresh** - No need to re-authenticate frequently
 - **Secure Credential Storage** - Credentials stored locally with proper permissions
 - **Invoice Management** - List, filter, and manage invoices
-- **Bank Transactions** - Create spend/receive money transactions
+- **Banking** - Create bank transactions and list bank accounts
 - **Clean CLI Interface** - Inspired by GitHub CLI's user-friendly design
 - **No External Runtime Dependencies** - Uses Go's standard library
 
@@ -77,8 +77,10 @@ Your credentials will be securely stored in `~/.xero-cli/config.toml` with restr
 ### Global Flags
 
 ```bash
---tenant <tenant_id>  Use a specific tenant for the request
+--tenant-id <tenant_id>  Tenant ID for the request (required for tenant-scoped commands)
 ```
+
+Tenant-scoped commands require a tenant ID. Provide it via the `--tenant-id` flag or set `XERO_TENANT_ID`. If both are set, `--tenant-id` takes precedence.
 
 ### Authentication Commands
 
@@ -135,11 +137,11 @@ xero invoices list --page 2 --page-size 50
 
 ---
 
-### Bank Transaction Commands
+### Banking Commands
 
 #### Create Bank Transactions
 ```bash
-xero banktransactions create --file banktransactions.json
+xero banking transactions --file banktransactions.json
 ```
 
 Optional flags:
@@ -178,7 +180,12 @@ scripts/convert_flex_csv.py /path/to/flex.csv \
   --account-code 400 \
   --bank-account-code 090 \
   --pretty \
-  | xero banktransactions create --file -
+  | xero banking transactions --file -
+```
+
+#### List Bank Accounts
+```bash
+xero banking list-accounts --tenant-id <tenant_id>
 ```
 
 ---
@@ -226,6 +233,7 @@ Tenant ID: abc123-def456-...
 Access token is valid
 
 # 3. List invoices
+$ export XERO_TENANT_ID=abc123-def456-...
 $ xero invoices list
 Fetching invoices...
 
@@ -253,6 +261,12 @@ You can also set your Client ID as an environment variable:
 ```bash
 export XERO_CLIENT_ID="your_client_id_here"
 xero auth login
+```
+
+Tenant-scoped commands require a tenant ID. You can set it once per shell:
+
+```bash
+export XERO_TENANT_ID="your_tenant_id_here"
 ```
 
 ## Project Structure
