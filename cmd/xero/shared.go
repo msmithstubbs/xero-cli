@@ -1,22 +1,27 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/msmithstubbs/xero-cli/internal/config"
 )
 
-func authHeaders(creds *config.Credentials) map[string]string {
-	tenantID := creds.TenantID
-	if strings.TrimSpace(tenantOverride) != "" {
-		tenantID = strings.TrimSpace(tenantOverride)
+func authHeaders(creds *config.Credentials) (map[string]string, error) {
+	tenantID := strings.TrimSpace(tenantOverride)
+	if tenantID == "" {
+		tenantID = strings.TrimSpace(os.Getenv("XERO_TENANT_ID"))
+	}
+	if tenantID == "" {
+		return nil, errors.New("tenant id is required. Provide --tenant-id or set XERO_TENANT_ID")
 	}
 	return map[string]string{
 		"authorization":  "Bearer " + creds.AccessToken,
 		"xero-tenant-id": tenantID,
 		"accept":         "application/json",
-	}
+	}, nil
 }
 
 func stringValue(data map[string]any, key, fallback string) string {

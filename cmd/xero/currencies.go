@@ -40,8 +40,13 @@ var currenciesListCmd = &cobra.Command{
 		fmt.Println("Fetching currencies...")
 		fmt.Println()
 
+		headers, err := authHeaders(creds)
+		if err != nil {
+			return err
+		}
+
 		client := xero.NewClient(xeroAPIBase)
-		status, body, err := client.Do("GET", endpoint, authHeaders(creds), nil)
+		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
 			return err
 		}
@@ -78,8 +83,13 @@ var currenciesGetCmd = &cobra.Command{
 		endpoint := fmt.Sprintf("%s/Currencies/%s", xeroAPIBase, currencyCode)
 		fmt.Printf("Fetching currency %s...\n\n", currencyCode)
 
+		headers, err := authHeaders(creds)
+		if err != nil {
+			return err
+		}
+
 		client := xero.NewClient(xeroAPIBase)
-		status, body, err := client.Do("GET", endpoint, authHeaders(creds), nil)
+		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
 			return err
 		}

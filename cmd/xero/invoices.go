@@ -48,8 +48,13 @@ var invoicesListCmd = &cobra.Command{
 		fmt.Println("Fetching invoices...")
 		fmt.Println()
 
+		headers, err := authHeaders(creds)
+		if err != nil {
+			return err
+		}
+
 		client := xero.NewClient(xeroAPIBase)
-		statusCode, body, err := client.Do("GET", endpoint, authHeaders(creds), nil)
+		statusCode, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
 			return err
 		}

@@ -41,8 +41,13 @@ var accountsListCmd = &cobra.Command{
 		fmt.Println("Fetching accounts...")
 		fmt.Println()
 
+		headers, err := authHeaders(creds)
+		if err != nil {
+			return err
+		}
+
 		client := xero.NewClient(xeroAPIBase)
-		status, body, err := client.Do("GET", endpoint, authHeaders(creds), nil)
+		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
 			return err
 		}
@@ -79,8 +84,13 @@ var accountsGetCmd = &cobra.Command{
 		endpoint := fmt.Sprintf("%s/Accounts/%s", xeroAPIBase, accountID)
 		fmt.Printf("Fetching account %s...\n\n", accountID)
 
+		headers, err := authHeaders(creds)
+		if err != nil {
+			return err
+		}
+
 		client := xero.NewClient(xeroAPIBase)
-		status, body, err := client.Do("GET", endpoint, authHeaders(creds), nil)
+		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
 			return err
 		}

@@ -57,7 +57,10 @@ var bankingTransactionsCmd = &cobra.Command{
 			endpoint = fmt.Sprintf("%s?%s", endpoint, encoded)
 		}
 
-		headers := authHeaders(creds)
+		headers, err := authHeaders(creds)
+		if err != nil {
+			return err
+		}
 		headers["content-type"] = "application/json"
 		if idempotency, _ := cmd.Flags().GetString("idempotency-key"); idempotency != "" {
 			headers["Idempotency-Key"] = idempotency
@@ -102,11 +105,9 @@ var bankingListAccountsCmd = &cobra.Command{
 		fmt.Println("Fetching bank accounts...")
 		fmt.Println()
 
-		headers := authHeaders(creds)
-		if cmd.Flags().Changed("tenant-id") {
-			if tenantID, _ := cmd.Flags().GetString("tenant-id"); strings.TrimSpace(tenantID) != "" {
-				headers["xero-tenant-id"] = strings.TrimSpace(tenantID)
-			}
+		headers, err := authHeaders(creds)
+		if err != nil {
+			return err
 		}
 
 		client := xero.NewClient(xeroAPIBase)
@@ -140,7 +141,6 @@ func init() {
 	bankingTransactionsCmd.Flags().Bool("summarize-errors", false, "Summarize validation errors in the response")
 	bankingTransactionsCmd.Flags().Int("unitdp", 0, "Unit decimal places for line items")
 	bankingTransactionsCmd.Flags().String("idempotency-key", "", "Idempotency key for safe retries")
-	bankingListAccountsCmd.Flags().String("tenant-id", "", "Tenant ID to use for this request")
 }
 
 func buildBankTransactionsPayload(path string) ([]byte, error) {

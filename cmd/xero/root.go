@@ -10,9 +10,9 @@ import (
 var tenantOverride string
 
 var rootCmd = &cobra.Command{
-	Use:   "xero",
-	Short: "Xero CLI - Command line tool for interacting with Xero API",
-	Long:  "A command-line interface for interacting with the Xero API, modeled after the GitHub CLI.",
+	Use:           "xero",
+	Short:         "Xero CLI - Command line tool for interacting with Xero API",
+	Long:          "A command-line interface for interacting with the Xero API, modeled after the GitHub CLI.",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
@@ -25,7 +25,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&tenantOverride, "tenant", "", "Tenant ID to use for this request")
+	rootCmd.PersistentFlags().StringVar(&tenantOverride, "tenant-id", "", "Tenant ID to use for this request")
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(invoicesCmd)
 	rootCmd.AddCommand(contactsCmd)

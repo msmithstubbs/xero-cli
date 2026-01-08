@@ -44,8 +44,13 @@ var contactsListCmd = &cobra.Command{
 		fmt.Println("Fetching contacts...")
 		fmt.Println()
 
+		headers, err := authHeaders(creds)
+		if err != nil {
+			return err
+		}
+
 		client := xero.NewClient(xeroAPIBase)
-		status, body, err := client.Do("GET", endpoint, authHeaders(creds), nil)
+		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
 			return err
 		}
@@ -82,8 +87,13 @@ var contactsGetCmd = &cobra.Command{
 		endpoint := fmt.Sprintf("%s/Contacts/%s", xeroAPIBase, contactID)
 		fmt.Printf("Fetching contact %s...\n\n", contactID)
 
+		headers, err := authHeaders(creds)
+		if err != nil {
+			return err
+		}
+
 		client := xero.NewClient(xeroAPIBase)
-		status, body, err := client.Do("GET", endpoint, authHeaders(creds), nil)
+		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
 			return err
 		}
