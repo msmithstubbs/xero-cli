@@ -74,6 +74,12 @@ Your credentials will be securely stored in `~/.xero-cli/config.toml` with restr
 
 ## Usage
 
+### Global Flags
+
+```bash
+--tenant <tenant_id>  Use a specific tenant for the request
+```
+
 ### Authentication Commands
 
 #### Login to Xero
@@ -173,6 +179,15 @@ scripts/convert_flex_csv.py /path/to/flex.csv \
   --bank-account-code 090 \
   --pretty \
   | xero banktransactions create --file -
+```
+
+---
+
+### Tenant Commands
+
+#### List Tenants
+```bash
+xero tenants list
 ```
 
 ---

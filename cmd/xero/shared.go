@@ -8,9 +8,13 @@ import (
 )
 
 func authHeaders(creds *config.Credentials) map[string]string {
+	tenantID := creds.TenantID
+	if strings.TrimSpace(tenantOverride) != "" {
+		tenantID = strings.TrimSpace(tenantOverride)
+	}
 	return map[string]string{
 		"authorization":  "Bearer " + creds.AccessToken,
-		"xero-tenant-id": creds.TenantID,
+		"xero-tenant-id": tenantID,
 		"accept":         "application/json",
 	}
 }
