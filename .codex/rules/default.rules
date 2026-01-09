@@ -1,0 +1,7 @@
+prefix_rule(
+    pattern=["go", "build"],
+    decision="allow",
+    match = [
+        "go build ./cmd/xero"
+    ]
+)
