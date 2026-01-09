@@ -100,6 +100,8 @@ var bankingTransactionsListCmd = &cobra.Command{
 
 		page, _ := cmd.Flags().GetInt("page")
 		pageSize, _ := cmd.Flags().GetInt("page-size")
+		accountID, _ := cmd.Flags().GetString("account-id")
+		order, _ := cmd.Flags().GetString("order")
 
 		params := url.Values{}
 		if page > 0 {
@@ -107,6 +109,12 @@ var bankingTransactionsListCmd = &cobra.Command{
 		}
 		if pageSize > 0 {
 			params.Set("pageSize", fmt.Sprintf("%d", pageSize))
+		}
+		if accountID != "" {
+			params.Set("where", fmt.Sprintf("BankAccount.AccountID==Guid(\"%s\")", accountID))
+		}
+		if strings.TrimSpace(order) != "" {
+			params.Set("order", order)
 		}
 
 		endpoint := fmt.Sprintf("%s/BankTransactions?%s", xeroAPIBase, params.Encode())
@@ -140,6 +148,57 @@ var bankingTransactionsListCmd = &cobra.Command{
 		transactions := getArray(payload, "BankTransactions")
 		displayBankTransactions(transactions)
 		return nil
+	},
+}
+
+var bankingTransactionsGetCmd = &cobra.Command{
+	Use:   "get <transaction_id>",
+	Short: "Get a single bank transaction by ID",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		transactionID := args[0]
+		creds, err := auth.GetValidCredentials()
+		if err != nil {
+			return err
+		}
+
+		endpoint := fmt.Sprintf("%s/BankTransactions/%s", xeroAPIBase, transactionID)
+		fmt.Printf("Fetching bank transaction %s...\n\n", transactionID)
+
+		headers, err := authHeaders(creds)
+		if err != nil {
+			return err
+		}
+
+		client := xero.NewClient(xeroAPIBase)
+		status, body, err := client.Do("GET", endpoint, headers, nil)
+		if err != nil {
+			return err
+		}
+
+		switch status {
+		case 200:
+			var payload map[string]any
+			if err := json.Unmarshal(body, &payload); err != nil {
+				return fmt.Errorf("failed to parse response: %w", err)
+			}
+			transactions := getArray(payload, "BankTransactions")
+			if len(transactions) == 0 {
+				fmt.Println("Bank transaction not found.")
+				return nil
+			}
+			if transaction, ok := transactions[0].(map[string]any); ok {
+				displayBankTransactionDetail(transaction)
+				return nil
+			}
+			return errors.New("unexpected response format")
+		case 401:
+			return errors.New("authentication failed. Please run 'xero auth login' again")
+		case 404:
+			return errors.New("bank transaction not found")
+		default:
+			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
+		}
 	},
 }
 
@@ -191,6 +250,7 @@ var bankingListAccountsCmd = &cobra.Command{
 func init() {
 	bankingCmd.AddCommand(bankingTransactionsCmd)
 	bankingTransactionsCmd.AddCommand(bankingTransactionsListCmd)
+	bankingTransactionsCmd.AddCommand(bankingTransactionsGetCmd)
 	bankingCmd.AddCommand(bankingListAccountsCmd)
 	bankingTransactionsCmd.Flags().String("file", "", "Path to JSON file containing bank transactions")
 	bankingTransactionsCmd.Flags().Bool("summarize-errors", false, "Summarize validation errors in the response")
@@ -198,6 +258,8 @@ func init() {
 	bankingTransactionsCmd.Flags().String("idempotency-key", "", "Idempotency key for safe retries")
 	bankingTransactionsListCmd.Flags().Int("page", 1, "Page number for pagination")
 	bankingTransactionsListCmd.Flags().Int("page-size", 100, "Number of items per page")
+	bankingTransactionsListCmd.Flags().String("account-id", "", "Filter transactions by bank account ID")
+	bankingTransactionsListCmd.Flags().String("order", "", "Order transactions by field, e.g. \"Date DESC\"")
 }
 
 func buildBankTransactionsPayload(path string) ([]byte, error) {
@@ -342,4 +404,39 @@ func displayBankTransactions(items []any) {
 	}
 
 	ui.PrintHeaderLine(150)
+}
+
+func displayBankTransactionDetail(transaction map[string]any) {
+	fmt.Println("Bank Transaction Details:")
+	fmt.Println()
+	ui.PrintHeaderLine(90)
+
+	fmt.Printf("Transaction ID:  %s\n", stringValue(transaction, "BankTransactionID", "N/A"))
+	fmt.Printf("Type:            %s\n", stringValue(transaction, "Type", "N/A"))
+	fmt.Printf("Status:          %s\n", stringValue(transaction, "Status", "N/A"))
+	fmt.Printf("Date:            %s\n", formatDate(transaction["Date"]))
+	fmt.Printf("Total:           %s\n", formatCurrency(transaction["Total"]))
+	fmt.Printf("Reference:       %s\n", stringValue(transaction, "Reference", "N/A"))
+	fmt.Printf("Currency:        %s\n", stringValue(transaction, "CurrencyCode", "N/A"))
+	fmt.Printf("Line Amounts:    %s\n", stringValue(transaction, "LineAmountTypes", "N/A"))
+
+	contactName := "N/A"
+	contactID := "N/A"
+	if contact, ok := transaction["Contact"].(map[string]any); ok {
+		contactName = stringValue(contact, "Name", "N/A")
+		contactID = stringValue(contact, "ContactID", "N/A")
+	}
+	fmt.Printf("Contact:         %s\n", contactName)
+	fmt.Printf("Contact ID:      %s\n", contactID)
+
+	bankAccountName := "N/A"
+	bankAccountID := "N/A"
+	if bankAccount, ok := transaction["BankAccount"].(map[string]any); ok {
+		bankAccountName = stringValue(bankAccount, "Name", "N/A")
+		bankAccountID = stringValue(bankAccount, "AccountID", "N/A")
+	}
+	fmt.Printf("Bank Account:    %s\n", bankAccountName)
+	fmt.Printf("Bank Account ID: %s\n", bankAccountID)
+
+	ui.PrintHeaderLine(90)
 }
