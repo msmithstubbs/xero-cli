@@ -21,10 +21,16 @@ var invoicesCreateCmd = &cobra.Command{
 			return err
 		}
 
+		bodyAttrs, err := parseInvoiceBody(cmd)
+		if err != nil {
+			return err
+		}
+
 		contactName, _ := cmd.Flags().GetString("contact")
 		contactName = strings.TrimSpace(contactName)
-		if contactName == "" {
-			return errors.New("--contact is required")
+		contactFromBody, contactFromBodyOk := extractContact(bodyAttrs)
+		if contactName == "" && !contactFromBodyOk {
+			return errors.New("--contact is required (or provide Contact in --body)")
 		}
 
 		invoiceType, _ := cmd.Flags().GetString("type")
@@ -39,51 +45,75 @@ var invoicesCreateCmd = &cobra.Command{
 			status = "DRAFT"
 		}
 
-		dateFlag, _ := cmd.Flags().GetString("date")
-		dueDateFlag, _ := cmd.Flags().GetString("due-date")
-		dueIn, _ := cmd.Flags().GetInt("due-in")
-		dateStr, dueDateStr, err := resolveInvoiceDates(dateFlag, dueDateFlag, dueIn)
-		if err != nil {
-			return err
-		}
-
 		lineDesc, _ := cmd.Flags().GetString("line-description")
 		lineQty, _ := cmd.Flags().GetFloat64("line-quantity")
 		lineUnit, _ := cmd.Flags().GetFloat64("line-unit-amount")
 		lineDesc = strings.TrimSpace(lineDesc)
-		if lineDesc == "" {
-			return errors.New("--line-description is required")
-		}
-		if lineQty <= 0 || lineUnit <= 0 {
-			return errors.New("--line-quantity and --line-unit-amount must be greater than 0")
-		}
-
-		accountCode, _ := cmd.Flags().GetString("account-code")
-		taxType, _ := cmd.Flags().GetString("tax-type")
-		itemCode, _ := cmd.Flags().GetString("item-code")
-
-		lineItem := map[string]any{
-			"Description": lineDesc,
-			"Quantity":    lineQty,
-			"UnitAmount":  lineUnit,
-		}
-		if trimmed := strings.TrimSpace(accountCode); trimmed != "" {
-			lineItem["AccountCode"] = trimmed
-		}
-		if trimmed := strings.TrimSpace(taxType); trimmed != "" {
-			lineItem["TaxType"] = trimmed
-		}
-		if trimmed := strings.TrimSpace(itemCode); trimmed != "" {
-			lineItem["ItemCode"] = trimmed
+		lineFlagsSet := cmd.Flags().Changed("line-description") ||
+			cmd.Flags().Changed("line-quantity") ||
+			cmd.Flags().Changed("line-unit-amount")
+		if lineFlagsSet {
+			if lineDesc == "" {
+				return errors.New("--line-description is required when line item fields are set")
+			}
+			if lineQty <= 0 || lineUnit <= 0 {
+				return errors.New("--line-quantity and --line-unit-amount must be greater than 0")
+			}
 		}
 
-		invoice := map[string]any{
-			"Type":      strings.ToUpper(invoiceType),
-			"Contact":   map[string]any{"Name": contactName},
-			"Date":      dateStr,
-			"DueDate":   dueDateStr,
-			"Status":    strings.ToUpper(status),
-			"LineItems": []any{lineItem},
+		invoice := cloneMap(bodyAttrs)
+
+		if contactName != "" {
+			invoice["Contact"] = map[string]any{"Name": contactName}
+		} else if contactFromBodyOk {
+			invoice["Contact"] = contactFromBody
+		}
+
+		if cmd.Flags().Changed("type") || !hasKey(invoice, "Type") {
+			invoice["Type"] = strings.ToUpper(invoiceType)
+		}
+		if cmd.Flags().Changed("status") || !hasKey(invoice, "Status") {
+			invoice["Status"] = strings.ToUpper(status)
+		}
+
+		if shouldSetDefaultDates(cmd, invoice) {
+			dateFlag, _ := cmd.Flags().GetString("date")
+			dueDateFlag, _ := cmd.Flags().GetString("due-date")
+			dueIn, _ := cmd.Flags().GetInt("due-in")
+			dateStr, dueDateStr, err := resolveInvoiceDates(dateFlag, dueDateFlag, dueIn)
+			if err != nil {
+				return err
+			}
+			invoice["Date"] = dateStr
+			invoice["DueDate"] = dueDateStr
+		}
+
+		if lineFlagsSet {
+			accountCode, _ := cmd.Flags().GetString("account-code")
+			taxType, _ := cmd.Flags().GetString("tax-type")
+			itemCode, _ := cmd.Flags().GetString("item-code")
+
+			lineItem := map[string]any{
+				"Description": lineDesc,
+				"Quantity":    lineQty,
+				"UnitAmount":  lineUnit,
+			}
+			if trimmed := strings.TrimSpace(accountCode); trimmed != "" {
+				lineItem["AccountCode"] = trimmed
+			}
+			if trimmed := strings.TrimSpace(taxType); trimmed != "" {
+				lineItem["TaxType"] = trimmed
+			}
+			if trimmed := strings.TrimSpace(itemCode); trimmed != "" {
+				lineItem["ItemCode"] = trimmed
+			}
+
+			existing := extractLineItems(invoice)
+			invoice["LineItems"] = append(existing, lineItem)
+		}
+
+		if len(extractLineItems(invoice)) == 0 {
+			return errors.New("at least one line item is required; use --line-* flags or provide LineItems in --body")
 		}
 
 		if currency, _ := cmd.Flags().GetString("currency"); strings.TrimSpace(currency) != "" {
@@ -141,6 +171,7 @@ func init() {
 	invoicesCreateCmd.Flags().String("date", "", "Invoice date in YYYY-MM-DD (defaults to today)")
 	invoicesCreateCmd.Flags().String("due-date", "", "Due date in YYYY-MM-DD (overrides --due-in)")
 	invoicesCreateCmd.Flags().Int("due-in", 7, "Number of days after the invoice date for the due date")
+	invoicesCreateCmd.Flags().String("body", "", "Raw JSON object of invoice attributes")
 	invoicesCreateCmd.Flags().String("line-description", "", "Line item description")
 	invoicesCreateCmd.Flags().Float64("line-quantity", 0, "Line item quantity")
 	invoicesCreateCmd.Flags().Float64("line-unit-amount", 0, "Line item unit amount")
@@ -178,4 +209,67 @@ func resolveInvoiceDates(dateFlag, dueDateFlag string, dueIn int) (string, strin
 	}
 
 	return baseDate.Format("2006-01-02"), dueDate.Format("2006-01-02"), nil
+}
+
+func parseInvoiceBody(cmd *cobra.Command) (map[string]any, error) {
+	body, _ := cmd.Flags().GetString("body")
+	if strings.TrimSpace(body) == "" {
+		return nil, nil
+	}
+
+	var decoded any
+	if err := json.Unmarshal([]byte(body), &decoded); err != nil {
+		return nil, fmt.Errorf("invalid --body JSON: %w", err)
+	}
+
+	obj, ok := decoded.(map[string]any)
+	if !ok {
+		return nil, errors.New("--body must be a JSON object")
+	}
+	return obj, nil
+}
+
+func extractContact(body map[string]any) (map[string]any, bool) {
+	if body == nil {
+		return nil, false
+	}
+	raw, ok := body["Contact"].(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	if id, ok := raw["ContactID"].(string); ok && strings.TrimSpace(id) != "" {
+		return raw, true
+	}
+	if name, ok := raw["Name"].(string); ok && strings.TrimSpace(name) != "" {
+		return raw, true
+	}
+	return nil, false
+}
+
+func cloneMap(input map[string]any) map[string]any {
+	if input == nil {
+		return map[string]any{}
+	}
+	output := make(map[string]any, len(input))
+	for key, value := range input {
+		output[key] = value
+	}
+	return output
+}
+
+func shouldSetDefaultDates(cmd *cobra.Command, invoice map[string]any) bool {
+	if cmd.Flags().Changed("date") || cmd.Flags().Changed("due-date") || cmd.Flags().Changed("due-in") {
+		return true
+	}
+	return !(hasKey(invoice, "Date") || hasKey(invoice, "DueDate"))
+}
+
+func extractLineItems(invoice map[string]any) []any {
+	if invoice == nil {
+		return nil
+	}
+	if items, ok := invoice["LineItems"].([]any); ok {
+		return items
+	}
+	return nil
 }
