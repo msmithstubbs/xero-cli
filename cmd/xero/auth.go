@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/msmithstubbs/xero-cli/internal/config"
+	"github.com/msmithstubbs/xero-cli/internal/credentials"
 	"github.com/msmithstubbs/xero-cli/internal/oauth"
 	"github.com/spf13/cobra"
 )
@@ -36,7 +36,7 @@ var authLoginCmd = &cobra.Command{
 			return errors.New("client ID is required")
 		}
 
-		authURL, err := oauth.GetAuthURL(clientID)
+		authURL, codeVerifier, err := oauth.GetAuthURL(clientID)
 		if err != nil {
 			return err
 		}
@@ -70,7 +70,7 @@ var authLoginCmd = &cobra.Command{
 			fmt.Println("Authorization code received")
 			fmt.Println("Exchanging code for access token...")
 
-			tokenData, err := oauth.ExchangeCode(code, clientID)
+			tokenData, err := oauth.ExchangeCode(code, clientID, codeVerifier)
 			if err != nil {
 				return fmt.Errorf("failed to exchange authorization code: %w", err)
 			}
@@ -87,7 +87,7 @@ var authLoginCmd = &cobra.Command{
 			}
 
 			tenant := connections[0]
-			creds := config.Credentials{
+			creds := credentials.Credentials{
 				ClientID:     clientID,
 				AccessToken:  tokenData.AccessToken,
 				RefreshToken: tokenData.RefreshToken,
@@ -97,7 +97,7 @@ var authLoginCmd = &cobra.Command{
 				ObtainedAt:   tokenData.ObtainedAt,
 			}
 
-			if err := config.SetCredentials(creds); err != nil {
+			if err := credentials.SetCredentials(creds); err != nil {
 				return fmt.Errorf("failed to save credentials: %w", err)
 			}
 
@@ -122,7 +122,7 @@ var authLogoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Log out and remove credentials",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := config.DeleteCredentials(); err != nil {
+		if err := credentials.DeleteCredentials(); err != nil {
 			return fmt.Errorf("failed to logout: %w", err)
 		}
 		fmt.Println("Successfully logged out. Credentials removed.")
@@ -134,7 +134,7 @@ var authStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Check authentication status",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		creds, err := config.GetCredentials()
+		creds, err := credentials.GetCredentials()
 		if err != nil {
 			return fmt.Errorf("not authenticated: %w", err)
 		}
@@ -193,29 +193,12 @@ func getClientID() (string, error) {
 		return env, nil
 	}
 
-	stored, err := config.GetSetting("client_id")
-	if err == nil && stored != "" {
-		if len(stored) > 8 {
-			fmt.Printf("Using saved Client ID: %s...\n", stored[:8])
-		} else {
-			fmt.Println("Using saved Client ID")
-		}
-		return stored, nil
-	}
-
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter your Xero Client ID: ")
 	clientID, _ := reader.ReadString('\n')
 	clientID = strings.TrimSpace(clientID)
 	if clientID == "" {
 		return "", nil
-	}
-
-	fmt.Print("Save Client ID for future use? (y/n): ")
-	response, _ := reader.ReadString('\n')
-	response = strings.ToLower(strings.TrimSpace(response))
-	if response == "y" {
-		_ = config.SetSetting("client_id", clientID)
 	}
 
 	return clientID, nil

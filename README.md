@@ -62,7 +62,7 @@ export PATH="$PATH:/path/to/xero-cli"
 Run the login command and follow the prompts:
 
 ```bash
-./xero auth login
+fnox exec xero auth login
 ```
 
 You'll be asked to:
@@ -70,7 +70,7 @@ You'll be asked to:
 2. Authorize the application in your browser
 3. The CLI will automatically capture the OAuth callback
 
-Your credentials will be securely stored in `~/.xero-cli/config.toml` with restricted file permissions (600).
+Your access and refresh tokens are stored in your system keychain.
 
 ## Usage
 
@@ -253,15 +253,13 @@ $ xero invoices list --status AUTHORISED
 
 ## Configuration
 
-Configuration and credentials are stored in `~/.xero-cli/config.toml`.
-If an existing `~/.xero-cli/config.json` is found, it will be migrated on first run.
-
-You can also set your Client ID as an environment variable:
+Use `fnox exec` so your Xero secrets are injected as environment variables:
 
 ```bash
-export XERO_CLIENT_ID="your_client_id_here"
-xero auth login
+fnox exec xero auth login
 ```
+
+The CLI reads `XERO_CLIENT_ID` (and optionally `XERO_PKCE_VERIFIER`) from the environment.
 
 Tenant-scoped commands require a tenant ID. You can set it once per shell:
 
@@ -277,7 +275,7 @@ xero-cli/
 |   `-- xero/                    # Cobra CLI entry point
 |-- internal/
 |   |-- auth/                    # Token validation + refresh
-|   |-- config/                  # TOML config + migration
+|   |-- credentials/             # Keychain-backed credential storage
 |   |-- oauth/                   # OAuth 2.0 flow
 |   |-- ui/                      # Output formatting helpers
 |   `-- xero/                    # HTTP client wrapper
@@ -293,14 +291,14 @@ xero-cli/
 2. **User Authorization**: Opens browser for user to authorize
 3. **Callback Server**: Starts a local server on port 8888 to receive the callback
 4. **Token Exchange**: Exchanges authorization code for access and refresh tokens
-5. **Token Storage**: Securely stores tokens with proper file permissions
+5. **Token Storage**: Stores tokens in the system keychain
 6. **Automatic Refresh**: Refreshes tokens automatically when expired
 
 ### Security Features
 
 - **PKCE**: Uses Proof Key for Code Exchange for enhanced OAuth security
 - **Token Expiration**: Tracks token expiration and refreshes automatically
-- **Secure Storage**: Config file has 600 permissions (owner read/write only)
+- **Secure Storage**: Access and refresh tokens are stored in the system keychain
 - **No Client Secret**: Designed for public OAuth clients (no client secret needed)
 
 ## Development

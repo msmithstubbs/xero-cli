@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/msmithstubbs/xero-cli/internal/config"
+	"github.com/msmithstubbs/xero-cli/internal/credentials"
 )
 
-func authHeaders(creds *config.Credentials) (map[string]string, error) {
+func authHeaders(creds *credentials.Credentials) (map[string]string, error) {
 	tenantID := strings.TrimSpace(tenantOverride)
 	if tenantID == "" {
 		tenantID = strings.TrimSpace(os.Getenv("XERO_TENANT_ID"))

@@ -11,9 +11,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
-	"github.com/msmithstubbs/xero-cli/internal/config"
+	"github.com/msmithstubbs/xero-cli/internal/credentials"
 )
 
 const (
@@ -35,16 +36,12 @@ type Connection struct {
 	TenantName string `json:"tenantName"`
 }
 
-func GetAuthURL(clientID string) (string, error) {
-	codeVerifier, err := generateCodeVerifier()
+func GetAuthURL(clientID string) (string, string, error) {
+	codeVerifier, err := codeVerifierFromEnv()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	codeChallenge := generateCodeChallenge(codeVerifier)
-
-	if err := config.SetSetting("pkce_verifier", codeVerifier); err != nil {
-		return "", err
-	}
 
 	params := url.Values{}
 	params.Set("response_type", "code")
@@ -54,14 +51,10 @@ func GetAuthURL(clientID string) (string, error) {
 	params.Set("code_challenge", codeChallenge)
 	params.Set("code_challenge_method", "S256")
 
-	return fmt.Sprintf("%s?%s", xeroAuthURL, params.Encode()), nil
+	return fmt.Sprintf("%s?%s", xeroAuthURL, params.Encode()), codeVerifier, nil
 }
 
-func ExchangeCode(code, clientID string) (*TokenData, error) {
-	codeVerifier, err := config.GetSetting("pkce_verifier")
-	if err != nil {
-		return nil, err
-	}
+func ExchangeCode(code, clientID, codeVerifier string) (*TokenData, error) {
 	if codeVerifier == "" {
 		return nil, errors.New("code verifier not found. Please restart the authentication process")
 	}
@@ -75,10 +68,6 @@ func ExchangeCode(code, clientID string) (*TokenData, error) {
 
 	data, err := postForm(xeroTokenURL, form)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := config.SetSetting("pkce_verifier", ""); err != nil {
 		return nil, err
 	}
 	data.ObtainedAt = time.Now().Unix()
@@ -128,7 +117,7 @@ func GetConnections(accessToken string) ([]Connection, error) {
 	return connections, nil
 }
 
-func TokenExpired(creds *config.Credentials) bool {
+func TokenExpired(creds *credentials.Credentials) bool {
 	if creds == nil || creds.ObtainedAt == 0 {
 		return true
 	}
@@ -138,6 +127,13 @@ func TokenExpired(creds *config.Credentials) bool {
 	}
 	current := time.Now().Unix()
 	return current >= creds.ObtainedAt+expiresIn-300
+}
+
+func codeVerifierFromEnv() (string, error) {
+	if env := os.Getenv("XERO_PKCE_VERIFIER"); env != "" {
+		return env, nil
+	}
+	return generateCodeVerifier()
 }
 
 type CallbackServer struct {

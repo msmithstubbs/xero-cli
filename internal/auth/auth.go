@@ -3,12 +3,12 @@ package auth
 import (
 	"fmt"
 
-	"github.com/msmithstubbs/xero-cli/internal/config"
+	"github.com/msmithstubbs/xero-cli/internal/credentials"
 	"github.com/msmithstubbs/xero-cli/internal/oauth"
 )
 
-func GetValidCredentials() (*config.Credentials, error) {
-	creds, err := config.GetCredentials()
+func GetValidCredentials() (*credentials.Credentials, error) {
+	creds, err := credentials.GetCredentials()
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func GetValidCredentials() (*config.Credentials, error) {
 		}
 		updated.ObtainedAt = newToken.ObtainedAt
 
-		if err := config.SetCredentials(updated); err != nil {
+		if err := credentials.SetCredentials(updated); err != nil {
 			return nil, fmt.Errorf("failed to save refreshed credentials: %w", err)
 		}
 		fmt.Println("Token refreshed")
