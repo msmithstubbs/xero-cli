@@ -11,6 +11,8 @@ import (
 const (
 	keyringService   = "xero-cli"
 	credentialsEntry = "credentials"
+	clientIDEntry    = "client_id"
+	pkceEntry        = "pkce_verifier"
 )
 
 type Credentials struct {
@@ -53,4 +55,35 @@ func DeleteCredentials() error {
 		return nil
 	}
 	return err
+}
+
+func GetClientID() (string, error) {
+	return getValue(clientIDEntry)
+}
+
+func SetClientID(clientID string) error {
+	return setValue(clientIDEntry, clientID)
+}
+
+func GetPKCEVerifier() (string, error) {
+	return getValue(pkceEntry)
+}
+
+func SetPKCEVerifier(verifier string) error {
+	return setValue(pkceEntry, verifier)
+}
+
+func getValue(key string) (string, error) {
+	value, err := keyring.Get(keyringService, key)
+	if err != nil {
+		if errors.Is(err, keyring.ErrNotFound) {
+			return "", nil
+		}
+		return "", err
+	}
+	return value, nil
+}
+
+func setValue(key, value string) error {
+	return keyring.Set(keyringService, key, value)
 }

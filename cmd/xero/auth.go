@@ -36,7 +36,15 @@ var authLoginCmd = &cobra.Command{
 			return errors.New("client ID is required")
 		}
 
-		authURL, codeVerifier, err := oauth.GetAuthURL(clientID)
+		codeVerifier, err := getPKCEVerifier()
+		if err != nil {
+			return err
+		}
+		if codeVerifier == "" {
+			return errors.New("pkce verifier is required")
+		}
+
+		authURL, err := oauth.GetAuthURL(clientID, codeVerifier)
 		if err != nil {
 			return err
 		}
@@ -188,9 +196,17 @@ func init() {
 }
 
 func getClientID() (string, error) {
-	if env := os.Getenv("XERO_CLIENT_ID"); env != "" {
-		fmt.Println("Using Client ID from XERO_CLIENT_ID environment variable")
-		return env, nil
+	stored, err := credentials.GetClientID()
+	if err != nil {
+		return "", err
+	}
+	if stored != "" {
+		if len(stored) > 8 {
+			fmt.Printf("Using saved Client ID: %s...\n", stored[:8])
+		} else {
+			fmt.Println("Using saved Client ID")
+		}
+		return stored, nil
 	}
 
 	reader := bufio.NewReader(os.Stdin)
@@ -201,7 +217,36 @@ func getClientID() (string, error) {
 		return "", nil
 	}
 
+	if err := credentials.SetClientID(clientID); err != nil {
+		return "", fmt.Errorf("failed to save client ID: %w", err)
+	}
+
 	return clientID, nil
+}
+
+func getPKCEVerifier() (string, error) {
+	stored, err := credentials.GetPKCEVerifier()
+	if err != nil {
+		return "", err
+	}
+	if stored != "" {
+		fmt.Println("Using saved PKCE verifier")
+		return stored, nil
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter your PKCE verifier: ")
+	verifier, _ := reader.ReadString('\n')
+	verifier = strings.TrimSpace(verifier)
+	if verifier == "" {
+		return "", nil
+	}
+
+	if err := credentials.SetPKCEVerifier(verifier); err != nil {
+		return "", fmt.Errorf("failed to save PKCE verifier: %w", err)
+	}
+
+	return verifier, nil
 }
 
 func openBrowser(url string) error {

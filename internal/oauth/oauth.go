@@ -11,7 +11,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/msmithstubbs/xero-cli/internal/credentials"
@@ -36,10 +35,9 @@ type Connection struct {
 	TenantName string `json:"tenantName"`
 }
 
-func GetAuthURL(clientID string) (string, string, error) {
-	codeVerifier, err := codeVerifierFromEnv()
-	if err != nil {
-		return "", "", err
+func GetAuthURL(clientID, codeVerifier string) (string, error) {
+	if codeVerifier == "" {
+		return "", errors.New("pkce verifier not found. Please restart the authentication process")
 	}
 	codeChallenge := generateCodeChallenge(codeVerifier)
 
@@ -51,7 +49,7 @@ func GetAuthURL(clientID string) (string, string, error) {
 	params.Set("code_challenge", codeChallenge)
 	params.Set("code_challenge_method", "S256")
 
-	return fmt.Sprintf("%s?%s", xeroAuthURL, params.Encode()), codeVerifier, nil
+	return fmt.Sprintf("%s?%s", xeroAuthURL, params.Encode()), nil
 }
 
 func ExchangeCode(code, clientID, codeVerifier string) (*TokenData, error) {
@@ -127,13 +125,6 @@ func TokenExpired(creds *credentials.Credentials) bool {
 	}
 	current := time.Now().Unix()
 	return current >= creds.ObtainedAt+expiresIn-300
-}
-
-func codeVerifierFromEnv() (string, error) {
-	if env := os.Getenv("XERO_PKCE_VERIFIER"); env != "" {
-		return env, nil
-	}
-	return generateCodeVerifier()
 }
 
 type CallbackServer struct {

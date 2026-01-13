@@ -62,7 +62,7 @@ export PATH="$PATH:/path/to/xero-cli"
 Run the login command and follow the prompts:
 
 ```bash
-fnox exec xero auth login
+xero auth login
 ```
 
 You'll be asked to:
@@ -70,7 +70,7 @@ You'll be asked to:
 2. Authorize the application in your browser
 3. The CLI will automatically capture the OAuth callback
 
-Your access and refresh tokens are stored in your system keychain.
+Your client ID, PKCE verifier, and tokens are stored in your system keychain.
 
 ## Usage
 
@@ -253,13 +253,7 @@ $ xero invoices list --status AUTHORISED
 
 ## Configuration
 
-Use `fnox exec` so your Xero secrets are injected as environment variables:
-
-```bash
-fnox exec xero auth login
-```
-
-The CLI reads `XERO_CLIENT_ID` (and optionally `XERO_PKCE_VERIFIER`) from the environment.
+The CLI stores the Client ID and PKCE verifier in your system keychain and will prompt for them if missing.
 
 Tenant-scoped commands require a tenant ID. You can set it once per shell:
 
@@ -291,14 +285,14 @@ xero-cli/
 2. **User Authorization**: Opens browser for user to authorize
 3. **Callback Server**: Starts a local server on port 8888 to receive the callback
 4. **Token Exchange**: Exchanges authorization code for access and refresh tokens
-5. **Token Storage**: Stores tokens in the system keychain
+5. **Token Storage**: Stores credentials in the system keychain
 6. **Automatic Refresh**: Refreshes tokens automatically when expired
 
 ### Security Features
 
 - **PKCE**: Uses Proof Key for Code Exchange for enhanced OAuth security
 - **Token Expiration**: Tracks token expiration and refreshes automatically
-- **Secure Storage**: Access and refresh tokens are stored in the system keychain
+- **Secure Storage**: Client ID, PKCE verifier, access, and refresh tokens are stored in the system keychain
 - **No Client Secret**: Designed for public OAuth clients (no client secret needed)
 
 ## Development
