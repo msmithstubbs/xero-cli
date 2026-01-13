@@ -140,14 +140,43 @@ var authStatusCmd = &cobra.Command{
 		}
 
 		fmt.Println("Authenticated")
-		fmt.Printf("Organization: %s\n", fallbackString(creds.TenantName, "Unknown"))
-		fmt.Printf("Tenant ID: %s\n", fallbackString(creds.TenantID, "Unknown"))
+		fmt.Println()
 
+		accessToken := creds.AccessToken
 		if oauth.TokenExpired(creds) {
-			fmt.Println("Access token expired. It will be refreshed on next API call.")
-		} else {
-			fmt.Println("Access token is valid")
+			fmt.Println("Access token expired. Refreshing...")
+			tokenData, err := oauth.RefreshToken(creds.RefreshToken, creds.ClientID)
+			if err != nil {
+				return fmt.Errorf("failed to refresh token: %w", err)
+			}
+
+			creds.AccessToken = tokenData.AccessToken
+			creds.RefreshToken = tokenData.RefreshToken
+			creds.ExpiresIn = tokenData.ExpiresIn
+			creds.ObtainedAt = tokenData.ObtainedAt
+
+			if err := config.SetCredentials(*creds); err != nil {
+				return fmt.Errorf("failed to save refreshed credentials: %w", err)
+			}
+			accessToken = tokenData.AccessToken
 		}
+
+		connections, err := oauth.GetConnections(accessToken)
+		if err != nil {
+			return fmt.Errorf("failed to fetch tenants: %w", err)
+		}
+
+		fmt.Printf("Available Tenants (%d):\n", len(connections))
+		fmt.Println()
+		for i, conn := range connections {
+			fmt.Printf("  %d. %s\n", i+1, fallbackString(conn.TenantName, "Unknown"))
+			fmt.Printf("     Tenant ID: %s\n", conn.TenantID)
+			if conn.TenantID == creds.TenantID {
+				fmt.Printf("     (active)\n")
+			}
+			fmt.Println()
+		}
+
 		return nil
 	},
 }
