@@ -145,6 +145,9 @@ var authStatusCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		creds, err := credentials.GetCredentials()
 		if err != nil {
+			if errors.Is(err, credentials.ErrKeychainAccess) {
+				fmt.Fprintln(os.Stderr, "Unable to access system keychain. Allow access for xero-cli and try again.")
+			}
 			return fmt.Errorf("not authenticated: %w", err)
 		}
 
@@ -228,6 +231,9 @@ func init() {
 func getClientID() (string, error) {
 	stored, err := credentials.GetClientID()
 	if err != nil {
+		if errors.Is(err, credentials.ErrKeychainAccess) {
+			fmt.Fprintln(os.Stderr, "Unable to access system keychain. Allow access for xero-cli and try again.")
+		}
 		return "", err
 	}
 	if stored != "" {
@@ -257,6 +263,9 @@ func getClientID() (string, error) {
 func getPKCEVerifier() (string, error) {
 	stored, err := credentials.GetPKCEVerifier()
 	if err != nil {
+		if errors.Is(err, credentials.ErrKeychainAccess) {
+			fmt.Fprintln(os.Stderr, "Unable to access system keychain. Allow access for xero-cli and try again.")
+		}
 		return "", err
 	}
 	if stored != "" {

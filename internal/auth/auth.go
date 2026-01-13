@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/msmithstubbs/xero-cli/internal/credentials"
 	"github.com/msmithstubbs/xero-cli/internal/oauth"
@@ -10,6 +12,9 @@ import (
 func GetValidCredentials() (*credentials.Credentials, error) {
 	creds, err := credentials.GetCredentials()
 	if err != nil {
+		if errors.Is(err, credentials.ErrKeychainAccess) {
+			fmt.Fprintln(os.Stderr, "Unable to access system keychain. Allow access for xero-cli and try again.")
+		}
 		return nil, err
 	}
 

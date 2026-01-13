@@ -15,6 +15,8 @@ const (
 	pkceEntry        = "pkce_verifier"
 )
 
+var ErrKeychainAccess = errors.New("keychain access error")
+
 type Credentials struct {
 	ClientID     string `json:"client_id"`
 	AccessToken  string `json:"access_token"`
@@ -31,7 +33,7 @@ func GetCredentials() (*Credentials, error) {
 		if errors.Is(err, keyring.ErrNotFound) {
 			return nil, errors.New("not authenticated. Run 'xero auth login' first.")
 		}
-		return nil, err
+		return nil, wrapKeychainErr(err)
 	}
 
 	var creds Credentials
@@ -79,11 +81,15 @@ func getValue(key string) (string, error) {
 		if errors.Is(err, keyring.ErrNotFound) {
 			return "", nil
 		}
-		return "", err
+		return "", wrapKeychainErr(err)
 	}
 	return value, nil
 }
 
 func setValue(key, value string) error {
 	return keyring.Set(keyringService, key, value)
+}
+
+func wrapKeychainErr(err error) error {
+	return fmt.Errorf("%w: %v", ErrKeychainAccess, err)
 }
