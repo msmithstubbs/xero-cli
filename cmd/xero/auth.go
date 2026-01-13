@@ -13,6 +13,7 @@ import (
 
 	"github.com/msmithstubbs/xero-cli/internal/credentials"
 	"github.com/msmithstubbs/xero-cli/internal/oauth"
+	"github.com/msmithstubbs/xero-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -176,13 +177,42 @@ var authStatusCmd = &cobra.Command{
 
 		fmt.Printf("Available Tenants (%d):\n", len(connections))
 		fmt.Println()
-		for i, conn := range connections {
-			fmt.Printf("  %d. %s\n", i+1, fallbackString(conn.TenantName, "Unknown"))
-			fmt.Printf("     Tenant ID: %s\n", conn.TenantID)
-			if conn.TenantID == creds.TenantID {
-				fmt.Printf("     (active)\n")
+
+		nameWidth := len("Tenant Name")
+		idWidth := len("Tenant ID")
+		activeWidth := len("Active")
+		for _, conn := range connections {
+			name := fallbackString(conn.TenantName, "Unknown")
+			id := fallbackString(conn.TenantID, "Unknown")
+			if l := len(name); l > nameWidth {
+				nameWidth = l
 			}
-			fmt.Println()
+			if l := len(id); l > idWidth {
+				idWidth = l
+			}
+		}
+
+		header := ui.FormatRow(
+			ui.Pad("Tenant Name", nameWidth),
+			ui.Pad("Tenant ID", idWidth),
+			ui.Pad("Active", activeWidth),
+		)
+		fmt.Println(header)
+		ui.PrintHeaderLine(nameWidth + idWidth + activeWidth + 6)
+
+		for _, conn := range connections {
+			name := fallbackString(conn.TenantName, "Unknown")
+			id := fallbackString(conn.TenantID, "Unknown")
+			active := ""
+			if conn.TenantID == creds.TenantID {
+				active = "yes"
+			}
+			row := ui.FormatRow(
+				ui.Pad(name, nameWidth),
+				ui.Pad(id, idWidth),
+				ui.Pad(active, activeWidth),
+			)
+			fmt.Println(row)
 		}
 
 		return nil
