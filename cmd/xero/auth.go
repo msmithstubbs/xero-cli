@@ -155,7 +155,7 @@ var authStatusCmd = &cobra.Command{
 			creds.ExpiresIn = tokenData.ExpiresIn
 			creds.ObtainedAt = tokenData.ObtainedAt
 
-			if err := config.SetCredentials(*creds); err != nil {
+			if err := credentials.SetCredentials(*creds); err != nil {
 				return fmt.Errorf("failed to save refreshed credentials: %w", err)
 			}
 			accessToken = tokenData.AccessToken
