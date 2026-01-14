@@ -12,8 +12,8 @@ import (
 func GetValidCredentials() (*credentials.Credentials, error) {
 	creds, err := credentials.GetCredentials()
 	if err != nil {
-		if errors.Is(err, credentials.ErrKeychainAccess) {
-			fmt.Fprintln(os.Stderr, "Unable to access system keychain. Allow access for xero-cli and try again.")
+		if errors.Is(err, credentials.ErrConfigAccess) {
+			fmt.Fprintln(os.Stderr, "Unable to access the tunnel config at ~/.config/zero-cli/tunnel. Check permissions and try again.")
 		}
 		return nil, err
 	}

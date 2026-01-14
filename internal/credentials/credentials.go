@@ -1,95 +1,194 @@
 package credentials
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-
-	"github.com/zalando/go-keyring"
+	"os"
+	"path/filepath"
 )
 
 const (
-	keyringService   = "xero-cli"
-	credentialsEntry = "credentials"
-	clientIDEntry    = "client_id"
-	pkceEntry        = "pkce_verifier"
+	configDirName  = "zero-cli"
+	configFileName = "tunnel"
 )
 
-var ErrKeychainAccess = errors.New("keychain access error")
+var ErrConfigAccess = errors.New("config access error")
 
 type Credentials struct {
 	ClientID     string `json:"client_id"`
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
-	TenantID     string `json:"tenant_id"`
-	TenantName   string `json:"tenant_name"`
 	ExpiresIn    int64  `json:"expires_in"`
 	ObtainedAt   int64  `json:"obtained_at"`
 }
 
+type tunnelConfig struct {
+	ClientID     string `json:"client_id,omitempty"`
+	PKCEVerifier string `json:"pkce_verifier,omitempty"`
+	AccessToken  string `json:"access_token,omitempty"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	ExpiresIn    int64  `json:"expires_in,omitempty"`
+	ObtainedAt   int64  `json:"obtained_at,omitempty"`
+}
+
 func GetCredentials() (*Credentials, error) {
-	value, err := keyring.Get(keyringService, credentialsEntry)
+	cfg, err := loadConfig()
 	if err != nil {
-		if errors.Is(err, keyring.ErrNotFound) {
-			return nil, errors.New("not authenticated. Run 'xero auth login' first.")
-		}
-		return nil, wrapKeychainErr(err)
+		return nil, err
+	}
+	if cfg.AccessToken == "" || cfg.RefreshToken == "" {
+		return nil, errors.New("not authenticated. Run 'xero auth login' first.")
 	}
 
-	var creds Credentials
-	if err := json.Unmarshal([]byte(value), &creds); err != nil {
-		return nil, fmt.Errorf("failed to decode stored credentials: %w", err)
-	}
-	return &creds, nil
+	return &Credentials{
+		ClientID:     cfg.ClientID,
+		AccessToken:  cfg.AccessToken,
+		RefreshToken: cfg.RefreshToken,
+		ExpiresIn:    cfg.ExpiresIn,
+		ObtainedAt:   cfg.ObtainedAt,
+	}, nil
 }
 
 func SetCredentials(creds Credentials) error {
-	payload, err := json.Marshal(creds)
+	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
-	return keyring.Set(keyringService, credentialsEntry, string(payload))
+	cfg.ClientID = creds.ClientID
+	cfg.AccessToken = creds.AccessToken
+	cfg.RefreshToken = creds.RefreshToken
+	cfg.ExpiresIn = creds.ExpiresIn
+	cfg.ObtainedAt = creds.ObtainedAt
+	return writeConfig(cfg)
 }
 
 func DeleteCredentials() error {
-	err := keyring.Delete(keyringService, credentialsEntry)
-	if errors.Is(err, keyring.ErrNotFound) {
-		return nil
+	cfg, err := loadConfig()
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
 	}
-	return err
+
+	cfg.AccessToken = ""
+	cfg.RefreshToken = ""
+	cfg.ExpiresIn = 0
+	cfg.ObtainedAt = 0
+
+	if cfg.ClientID == "" && cfg.PKCEVerifier == "" {
+		return removeConfigFile()
+	}
+
+	return writeConfig(cfg)
 }
 
 func GetClientID() (string, error) {
-	return getValue(clientIDEntry)
+	cfg, err := loadConfig()
+	if err != nil {
+		return "", err
+	}
+	return cfg.ClientID, nil
 }
 
 func SetClientID(clientID string) error {
-	return setValue(clientIDEntry, clientID)
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	cfg.ClientID = clientID
+	return writeConfig(cfg)
 }
 
 func GetPKCEVerifier() (string, error) {
-	return getValue(pkceEntry)
+	cfg, err := loadConfig()
+	if err != nil {
+		return "", err
+	}
+	return cfg.PKCEVerifier, nil
 }
 
 func SetPKCEVerifier(verifier string) error {
-	return setValue(pkceEntry, verifier)
-}
-
-func getValue(key string) (string, error) {
-	value, err := keyring.Get(keyringService, key)
+	cfg, err := loadConfig()
 	if err != nil {
-		if errors.Is(err, keyring.ErrNotFound) {
-			return "", nil
-		}
-		return "", wrapKeychainErr(err)
+		return err
 	}
-	return value, nil
+	cfg.PKCEVerifier = verifier
+	return writeConfig(cfg)
 }
 
-func setValue(key, value string) error {
-	return keyring.Set(keyringService, key, value)
+func loadConfig() (tunnelConfig, error) {
+	path, err := configPath()
+	if err != nil {
+		return tunnelConfig{}, err
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return tunnelConfig{}, nil
+		}
+		return tunnelConfig{}, wrapConfigErr(path, err)
+	}
+
+	if len(bytes.TrimSpace(data)) == 0 {
+		return tunnelConfig{}, nil
+	}
+
+	var cfg tunnelConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return tunnelConfig{}, wrapConfigErr(path, fmt.Errorf("failed to decode tunnel config: %w", err))
+	}
+
+	return cfg, nil
 }
 
-func wrapKeychainErr(err error) error {
-	return fmt.Errorf("%w: %v", ErrKeychainAccess, err)
+func writeConfig(cfg tunnelConfig) error {
+	path, err := configPath()
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return wrapConfigErr(path, err)
+	}
+
+	payload, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(path, payload, 0o600); err != nil {
+		return wrapConfigErr(path, err)
+	}
+
+	return nil
+}
+
+func removeConfigFile() error {
+	path, err := configPath()
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return wrapConfigErr(path, err)
+	}
+	return nil
+}
+
+func configPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", ErrConfigAccess, err)
+	}
+	return filepath.Join(home, ".config", configDirName, configFileName), nil
+}
+
+func wrapConfigErr(path string, err error) error {
+	return fmt.Errorf("%w: %s: %v", ErrConfigAccess, path, err)
 }

@@ -95,13 +95,10 @@ var authLoginCmd = &cobra.Command{
 				return errors.New("no Xero organizations found for this account")
 			}
 
-			tenant := connections[0]
 			creds := credentials.Credentials{
 				ClientID:     clientID,
 				AccessToken:  tokenData.AccessToken,
 				RefreshToken: tokenData.RefreshToken,
-				TenantID:     tenant.TenantID,
-				TenantName:   tenant.TenantName,
 				ExpiresIn:    tokenData.ExpiresIn,
 				ObtainedAt:   tokenData.ObtainedAt,
 			}
@@ -111,6 +108,7 @@ var authLoginCmd = &cobra.Command{
 			}
 
 			fmt.Println("\nSuccessfully authenticated with Xero!")
+			tenant := connections[0]
 			fmt.Printf("Organization: %s\n", tenant.TenantName)
 			fmt.Printf("Tenant ID: %s\n", tenant.TenantID)
 			fmt.Println("\nYou can now use the Xero CLI.")
@@ -145,8 +143,8 @@ var authStatusCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		creds, err := credentials.GetCredentials()
 		if err != nil {
-			if errors.Is(err, credentials.ErrKeychainAccess) {
-				fmt.Fprintln(os.Stderr, "Unable to access system keychain. Allow access for xero-cli and try again.")
+			if errors.Is(err, credentials.ErrConfigAccess) {
+				fmt.Fprintln(os.Stderr, "Unable to access the tunnel config at ~/.config/zero-cli/tunnel. Check permissions and try again.")
 			}
 			return fmt.Errorf("not authenticated: %w", err)
 		}
@@ -183,7 +181,6 @@ var authStatusCmd = &cobra.Command{
 
 		nameWidth := len("Tenant Name")
 		idWidth := len("Tenant ID")
-		activeWidth := len("Active")
 		for _, conn := range connections {
 			name := fallbackString(conn.TenantName, "Unknown")
 			id := fallbackString(conn.TenantID, "Unknown")
@@ -198,22 +195,16 @@ var authStatusCmd = &cobra.Command{
 		header := ui.FormatRow(
 			ui.Pad("Tenant Name", nameWidth),
 			ui.Pad("Tenant ID", idWidth),
-			ui.Pad("Active", activeWidth),
 		)
 		fmt.Println(header)
-		ui.PrintHeaderLine(nameWidth + idWidth + activeWidth + 6)
+		ui.PrintHeaderLine(nameWidth + idWidth + 3)
 
 		for _, conn := range connections {
 			name := fallbackString(conn.TenantName, "Unknown")
 			id := fallbackString(conn.TenantID, "Unknown")
-			active := ""
-			if conn.TenantID == creds.TenantID {
-				active = "yes"
-			}
 			row := ui.FormatRow(
 				ui.Pad(name, nameWidth),
 				ui.Pad(id, idWidth),
-				ui.Pad(active, activeWidth),
 			)
 			fmt.Println(row)
 		}
@@ -231,8 +222,8 @@ func init() {
 func getClientID() (string, error) {
 	stored, err := credentials.GetClientID()
 	if err != nil {
-		if errors.Is(err, credentials.ErrKeychainAccess) {
-			fmt.Fprintln(os.Stderr, "Unable to access system keychain. Allow access for xero-cli and try again.")
+		if errors.Is(err, credentials.ErrConfigAccess) {
+			fmt.Fprintln(os.Stderr, "Unable to access the tunnel config at ~/.config/zero-cli/tunnel. Check permissions and try again.")
 		}
 		return "", err
 	}
@@ -263,8 +254,8 @@ func getClientID() (string, error) {
 func getPKCEVerifier() (string, error) {
 	stored, err := credentials.GetPKCEVerifier()
 	if err != nil {
-		if errors.Is(err, credentials.ErrKeychainAccess) {
-			fmt.Fprintln(os.Stderr, "Unable to access system keychain. Allow access for xero-cli and try again.")
+		if errors.Is(err, credentials.ErrConfigAccess) {
+			fmt.Fprintln(os.Stderr, "Unable to access the tunnel config at ~/.config/zero-cli/tunnel. Check permissions and try again.")
 		}
 		return "", err
 	}

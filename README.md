@@ -70,7 +70,7 @@ You'll be asked to:
 2. Authorize the application in your browser
 3. The CLI will automatically capture the OAuth callback
 
-Your client ID, PKCE verifier, and tokens are stored in your system keychain.
+Your client ID, PKCE verifier, and tokens are stored in `~/.config/zero-cli/tunnel`.
 
 ## Usage
 
@@ -96,7 +96,7 @@ Starts the OAuth 2.0 authentication flow. Opens your browser automatically and w
 xero auth status
 ```
 
-Shows your current authentication status, organization, and token validity.
+Shows your current authentication status, available tenants, and token validity.
 
 #### Logout
 ```bash
@@ -272,7 +272,7 @@ $ xero invoices list --status AUTHORISED
 
 ## Configuration
 
-The CLI stores the Client ID and PKCE verifier in your system keychain and will prompt for them if missing.
+The CLI stores the Client ID and PKCE verifier in `~/.config/zero-cli/tunnel` and will prompt for them if missing.
 
 Tenant-scoped commands require a tenant ID. You can set it once per shell:
 
@@ -288,7 +288,7 @@ xero-cli/
 |   `-- xero/                    # Cobra CLI entry point
 |-- internal/
 |   |-- auth/                    # Token validation + refresh
-|   |-- credentials/             # Keychain-backed credential storage
+|   |-- credentials/             # Config-file credential storage
 |   |-- oauth/                   # OAuth 2.0 flow
 |   |-- ui/                      # Output formatting helpers
 |   `-- xero/                    # HTTP client wrapper
@@ -304,14 +304,14 @@ xero-cli/
 2. **User Authorization**: Opens browser for user to authorize
 3. **Callback Server**: Starts a local server on port 8888 to receive the callback
 4. **Token Exchange**: Exchanges authorization code for access and refresh tokens
-5. **Token Storage**: Stores credentials in the system keychain
+5. **Token Storage**: Stores credentials in `~/.config/zero-cli/tunnel`
 6. **Automatic Refresh**: Refreshes tokens automatically when expired
 
 ### Security Features
 
 - **PKCE**: Uses Proof Key for Code Exchange for enhanced OAuth security
 - **Token Expiration**: Tracks token expiration and refreshes automatically
-- **Secure Storage**: Client ID, PKCE verifier, access, and refresh tokens are stored in the system keychain
+- **Secure Storage**: Client ID, PKCE verifier, access, and refresh tokens are stored in `~/.config/zero-cli/tunnel`
 - **No Client Secret**: Designed for public OAuth clients (no client secret needed)
 
 ## Development
