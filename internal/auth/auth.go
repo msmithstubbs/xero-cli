@@ -13,7 +13,7 @@ func GetValidCredentials() (*credentials.Credentials, error) {
 	creds, err := credentials.GetCredentials()
 	if err != nil {
 		if errors.Is(err, credentials.ErrConfigAccess) {
-			fmt.Fprintln(os.Stderr, "Unable to access the tunnel config at ~/.config/zero-cli/tunnel. Check permissions and try again.")
+			fmt.Fprintln(os.Stderr, "Unable to access credentials at ~/.config/xero-cli/credentials.toml. Check permissions and try again.")
 		}
 		return nil, err
 	}
