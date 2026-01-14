@@ -60,8 +60,14 @@ var invoicesAttachCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		verbose, _ := cmd.Flags().GetBool("verbose")
+		if verbose {
+			fmt.Printf("HTTP Status: %d\nResponse: %s\n", status, string(body))
+		}
+
 		if status == 401 {
-			return errors.New("authentication failed. Please run 'xero auth login' again")
+			return fmt.Errorf("authentication failed (status 401). Response: %s\nPlease run 'xero auth login' again", string(body))
 		}
 		if status < 200 || status >= 300 {
 			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
@@ -86,6 +92,7 @@ func init() {
 	invoicesCmd.AddCommand(invoicesAttachCmd)
 	invoicesAttachCmd.Flags().String("file", "", "Path to PDF file to attach")
 	invoicesAttachCmd.Flags().String("name", "", "Attachment file name (defaults to the PDF base name)")
+	invoicesAttachCmd.Flags().Bool("verbose", false, "Print raw API response to stdout")
 }
 
 func loadInvoiceAttachment(path, name string) ([]byte, string, error) {
