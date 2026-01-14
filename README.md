@@ -135,6 +135,18 @@ xero invoices list --status DRAFT
 xero invoices list --page 2 --page-size 50
 ```
 
+#### Create an Invoice
+```bash
+xero invoices create \
+  --contact "Acme Corp" \
+  --line-description "Consulting services" \
+  --line-quantity 1 \
+  --line-unit-amount 1500 \
+  --account-code 200
+```
+
+Provide a contact by name (`--contact`) or ID (`--contact-id`). For advanced cases, pass a raw JSON invoice object via `--body`.
+
 ---
 
 ### Banking Commands
@@ -350,7 +362,8 @@ sudo update-ca-certificates
 ## Roadmap
 
 Future features planned:
-- [ ] Create and update invoices
+- [x] Create invoices
+- [ ] Update invoices
 - [ ] Contact management
 - [ ] Bank transaction reconciliation
 - [ ] Report generation

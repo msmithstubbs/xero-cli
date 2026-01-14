@@ -27,10 +27,15 @@ var invoicesCreateCmd = &cobra.Command{
 		}
 
 		contactName, _ := cmd.Flags().GetString("contact")
+		contactID, _ := cmd.Flags().GetString("contact-id")
 		contactName = strings.TrimSpace(contactName)
+		contactID = strings.TrimSpace(contactID)
 		contactFromBody, contactFromBodyOk := extractContact(bodyAttrs)
-		if contactName == "" && !contactFromBodyOk {
-			return errors.New("--contact is required (or provide Contact in --body)")
+		if contactName != "" && contactID != "" {
+			return errors.New("use either --contact or --contact-id, not both")
+		}
+		if contactName == "" && contactID == "" && !contactFromBodyOk {
+			return errors.New("--contact or --contact-id is required (or provide Contact in --body)")
 		}
 
 		invoiceType, _ := cmd.Flags().GetString("type")
@@ -63,7 +68,9 @@ var invoicesCreateCmd = &cobra.Command{
 
 		invoice := cloneMap(bodyAttrs)
 
-		if contactName != "" {
+		if contactID != "" {
+			invoice["Contact"] = map[string]any{"ContactID": contactID}
+		} else if contactName != "" {
 			invoice["Contact"] = map[string]any{"Name": contactName}
 		} else if contactFromBodyOk {
 			invoice["Contact"] = contactFromBody
@@ -166,6 +173,7 @@ var invoicesCreateCmd = &cobra.Command{
 func init() {
 	invoicesCmd.AddCommand(invoicesCreateCmd)
 	invoicesCreateCmd.Flags().String("contact", "", "Contact name for the invoice")
+	invoicesCreateCmd.Flags().String("contact-id", "", "Contact ID for the invoice")
 	invoicesCreateCmd.Flags().String("type", "ACCREC", "Invoice type (ACCREC or ACCPAY)")
 	invoicesCreateCmd.Flags().String("status", "DRAFT", "Invoice status (defaults to DRAFT)")
 	invoicesCreateCmd.Flags().String("date", "", "Invoice date in YYYY-MM-DD (defaults to today)")
