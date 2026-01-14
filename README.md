@@ -147,6 +147,13 @@ xero invoices create \
 
 Provide a contact by name (`--contact`) or ID (`--contact-id`). For advanced cases, pass a raw JSON invoice object via `--body`.
 
+#### Update an Invoice
+```bash
+xero invoices update <invoice_id> \
+  --status AUTHORISED \
+  --reference "Updated reference"
+```
+
 ---
 
 ### Banking Commands
@@ -363,7 +370,7 @@ sudo update-ca-certificates
 
 Future features planned:
 - [x] Create invoices
-- [ ] Update invoices
+- [x] Update invoices
 - [ ] Contact management
 - [ ] Bank transaction reconciliation
 - [ ] Report generation
