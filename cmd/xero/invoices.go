@@ -17,6 +17,7 @@ import (
 var invoicesCmd = &cobra.Command{
 	Use:   "invoices",
 	Short: "Manage invoices",
+	Long:  "Manage invoices in Xero.",
 }
 
 var invoicesListCmd = &cobra.Command{
