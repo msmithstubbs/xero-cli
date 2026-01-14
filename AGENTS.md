@@ -4,5 +4,6 @@ Commit changes at regular intervals, such as completing a feature or fixing a bu
 
 You can test the Xero cli again the Demo Company tenant.
 If demo company isn't available ask the user to run `xero auth login` and grant access again.
+ONLY use the Demo Company tenant.
 
 Xero API docs are available at https://developer.xero.com/documentation/api/accounting/overview

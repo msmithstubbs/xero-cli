@@ -2,35 +2,36 @@ package credentials
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/BurntSushi/toml"
 )
 
 const (
-	configDirName  = "zero-cli"
-	configFileName = "tunnel"
+	configDirName  = "xero-cli"
+	configFileName = "credentials.toml"
 )
 
 var ErrConfigAccess = errors.New("config access error")
 
 type Credentials struct {
-	ClientID     string `json:"client_id"`
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int64  `json:"expires_in"`
-	ObtainedAt   int64  `json:"obtained_at"`
+	ClientID     string `toml:"client_id"`
+	AccessToken  string `toml:"access_token"`
+	RefreshToken string `toml:"refresh_token"`
+	ExpiresIn    int64  `toml:"expires_in"`
+	ObtainedAt   int64  `toml:"obtained_at"`
 }
 
-type tunnelConfig struct {
-	ClientID     string `json:"client_id,omitempty"`
-	PKCEVerifier string `json:"pkce_verifier,omitempty"`
-	AccessToken  string `json:"access_token,omitempty"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	ExpiresIn    int64  `json:"expires_in,omitempty"`
-	ObtainedAt   int64  `json:"obtained_at,omitempty"`
+type configFile struct {
+	ClientID     string `toml:"client_id,omitempty"`
+	PKCEVerifier string `toml:"pkce_verifier,omitempty"`
+	AccessToken  string `toml:"access_token,omitempty"`
+	RefreshToken string `toml:"refresh_token,omitempty"`
+	ExpiresIn    int64  `toml:"expires_in,omitempty"`
+	ObtainedAt   int64  `toml:"obtained_at,omitempty"`
 }
 
 func GetCredentials() (*Credentials, error) {
@@ -119,33 +120,33 @@ func SetPKCEVerifier(verifier string) error {
 	return writeConfig(cfg)
 }
 
-func loadConfig() (tunnelConfig, error) {
+func loadConfig() (configFile, error) {
 	path, err := configPath()
 	if err != nil {
-		return tunnelConfig{}, err
+		return configFile{}, err
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return tunnelConfig{}, nil
+			return configFile{}, nil
 		}
-		return tunnelConfig{}, wrapConfigErr(path, err)
+		return configFile{}, wrapConfigErr(path, err)
 	}
 
 	if len(bytes.TrimSpace(data)) == 0 {
-		return tunnelConfig{}, nil
+		return configFile{}, nil
 	}
 
-	var cfg tunnelConfig
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return tunnelConfig{}, wrapConfigErr(path, fmt.Errorf("failed to decode tunnel config: %w", err))
+	var cfg configFile
+	if err := toml.Unmarshal(data, &cfg); err != nil {
+		return configFile{}, wrapConfigErr(path, fmt.Errorf("failed to decode config: %w", err))
 	}
 
 	return cfg, nil
 }
 
-func writeConfig(cfg tunnelConfig) error {
+func writeConfig(cfg configFile) error {
 	path, err := configPath()
 	if err != nil {
 		return err
@@ -155,12 +156,13 @@ func writeConfig(cfg tunnelConfig) error {
 		return wrapConfigErr(path, err)
 	}
 
-	payload, err := json.MarshalIndent(cfg, "", "  ")
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
-		return err
+		return wrapConfigErr(path, err)
 	}
+	defer f.Close()
 
-	if err := os.WriteFile(path, payload, 0o600); err != nil {
+	if err := toml.NewEncoder(f).Encode(cfg); err != nil {
 		return wrapConfigErr(path, err)
 	}
 
