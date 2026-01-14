@@ -45,7 +45,7 @@ func GetAuthURL(clientID, codeVerifier string) (string, error) {
 	params.Set("response_type", "code")
 	params.Set("client_id", clientID)
 	params.Set("redirect_uri", redirectURI)
-	params.Set("scope", "offline_access openid profile email accounting.transactions accounting.contacts accounting.settings")
+	params.Set("scope", "offline_access openid profile email accounting.transactions accounting.contacts accounting.settings accounting.attachments")
 	params.Set("code_challenge", codeChallenge)
 	params.Set("code_challenge_method", "S256")
 
