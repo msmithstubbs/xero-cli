@@ -80,7 +80,7 @@ Your client ID, PKCE verifier, and tokens are stored in `~/.config/zero-cli/tunn
 --tenant-id <tenant_id>  Tenant ID for the request (required for tenant-scoped commands)
 ```
 
-Tenant-scoped commands require a tenant ID. Provide it via the `--tenant-id` flag or set `XERO_TENANT_ID`. If both are set, `--tenant-id` takes precedence.
+Tenant-scoped commands require a tenant ID. Provide it via the `--tenant-id` flag or set `TENANT_ID`/`XERO_TENANT_ID`. If multiple values are set, `--tenant-id` takes precedence, then `TENANT_ID`, then `XERO_TENANT_ID`.
 
 ### Authentication Commands
 
@@ -252,7 +252,7 @@ Tenant ID: abc123-def456-...
 Access token is valid
 
 # 3. List invoices
-$ export XERO_TENANT_ID=abc123-def456-...
+$ export TENANT_ID=abc123-def456-...
 $ xero invoices list
 Fetching invoices...
 
@@ -277,7 +277,7 @@ The CLI stores the Client ID and PKCE verifier in `~/.config/zero-cli/tunnel` an
 Tenant-scoped commands require a tenant ID. You can set it once per shell:
 
 ```bash
-export XERO_TENANT_ID="your_tenant_id_here"
+export TENANT_ID="your_tenant_id_here"
 ```
 
 ## Project Structure

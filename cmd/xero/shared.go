@@ -12,10 +12,13 @@ import (
 func authHeaders(creds *credentials.Credentials) (map[string]string, error) {
 	tenantID := strings.TrimSpace(tenantOverride)
 	if tenantID == "" {
+		tenantID = strings.TrimSpace(os.Getenv("TENANT_ID"))
+	}
+	if tenantID == "" {
 		tenantID = strings.TrimSpace(os.Getenv("XERO_TENANT_ID"))
 	}
 	if tenantID == "" {
-		return nil, errors.New("tenant id is required. Provide --tenant-id or set XERO_TENANT_ID")
+		return nil, errors.New("tenant id is required. Provide --tenant-id or set TENANT_ID or XERO_TENANT_ID")
 	}
 	return map[string]string{
 		"authorization":  "Bearer " + creds.AccessToken,
