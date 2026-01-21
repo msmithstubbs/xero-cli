@@ -32,5 +32,6 @@ func init() {
 	rootCmd.AddCommand(accountsCmd)
 	rootCmd.AddCommand(currenciesCmd)
 	rootCmd.AddCommand(bankingCmd)
+	rootCmd.AddCommand(paymentsCmd)
 	rootCmd.AddCommand(tenantsCmd)
 }
