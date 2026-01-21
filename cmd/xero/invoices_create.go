@@ -194,7 +194,7 @@ func init() {
 	invoicesCreateCmd.Flags().String("contact", "", "Contact name for the invoice")
 	invoicesCreateCmd.Flags().String("contact-id", "", "Contact ID for the invoice")
 	invoicesCreateCmd.Flags().String("type", "ACCREC", "Invoice type (ACCREC or ACCPAY)")
-	invoicesCreateCmd.Flags().String("status", "DRAFT", "Invoice status (defaults to DRAFT)")
+	invoicesCreateCmd.Flags().String("status", "DRAFT", "Invoice status (DRAFT, SUBMITTED, AUTHORISED, PAID, VOIDED, DELETED)")
 	invoicesCreateCmd.Flags().String("date", "", "Invoice date in YYYY-MM-DD (defaults to today)")
 	invoicesCreateCmd.Flags().String("due-date", "", "Due date in YYYY-MM-DD (overrides --due-in)")
 	invoicesCreateCmd.Flags().Int("due-in", 7, "Number of days after the invoice date for the due date")
