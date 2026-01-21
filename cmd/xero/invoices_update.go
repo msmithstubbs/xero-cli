@@ -139,7 +139,16 @@ var invoicesUpdateCmd = &cobra.Command{
 			if reference, _ := cmd.Flags().GetString("reference"); strings.TrimSpace(reference) == "" {
 				return errors.New("--reference cannot be empty")
 			} else {
-				invoice["Reference"] = strings.TrimSpace(reference)
+				ref := strings.TrimSpace(reference)
+				invType := ""
+				if raw, ok := invoice["Type"].(string); ok {
+					invType = strings.ToUpper(strings.TrimSpace(raw))
+				}
+				if invType == "ACCPAY" {
+					invoice["InvoiceNumber"] = ref
+				} else {
+					invoice["Reference"] = ref
+				}
 			}
 		}
 
