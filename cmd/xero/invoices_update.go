@@ -63,11 +63,11 @@ var invoicesUpdateCmd = &cobra.Command{
 
 		status, _ := cmd.Flags().GetString("status")
 		if cmd.Flags().Changed("status") {
-			status = strings.TrimSpace(status)
-			if status == "" {
-				return errors.New("--status cannot be empty")
+			normalized, err := validateInvoiceStatus(status)
+			if err != nil {
+				return err
 			}
-			invoice["Status"] = strings.ToUpper(status)
+			invoice["Status"] = normalized
 		}
 
 		if err := applyInvoiceUpdateDates(cmd, invoice); err != nil {

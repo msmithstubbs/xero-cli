@@ -57,3 +57,16 @@ func filterEmpty(values []string) []string {
 	}
 	return filtered
 }
+
+func validateInvoiceStatus(value string) (string, error) {
+	trimmed := strings.ToUpper(strings.TrimSpace(value))
+	if trimmed == "" {
+		return "", errors.New("invoice status cannot be empty")
+	}
+	switch trimmed {
+	case "DRAFT", "SUBMITTED", "AUTHORISED", "PAID", "VOIDED", "DELETED":
+		return trimmed, nil
+	default:
+		return "", fmt.Errorf("invalid invoice status %q; use DRAFT, SUBMITTED, AUTHORISED, PAID, VOIDED, or DELETED", value)
+	}
+}

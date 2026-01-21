@@ -49,6 +49,13 @@ var invoicesCreateCmd = &cobra.Command{
 		if status == "" {
 			status = "DRAFT"
 		}
+		if cmd.Flags().Changed("status") {
+			normalized, err := validateInvoiceStatus(status)
+			if err != nil {
+				return err
+			}
+			status = normalized
+		}
 
 		lineDesc, _ := cmd.Flags().GetString("line-description")
 		lineQty, _ := cmd.Flags().GetFloat64("line-quantity")
