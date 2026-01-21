@@ -157,6 +157,25 @@ xero invoices update <invoice_id> \
 
 ---
 
+### Contact Commands
+
+#### List Contacts
+```bash
+xero contacts list
+```
+
+#### Get a Contact
+```bash
+xero contacts get <contact_id>
+```
+
+#### Create a Contact
+```bash
+xero contacts create --name "Acme Corp" --email "ap@acme.example"
+```
+
+---
+
 ### Payments Commands
 
 #### List Payments
