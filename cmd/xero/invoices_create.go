@@ -133,7 +133,19 @@ var invoicesCreateCmd = &cobra.Command{
 			invoice["BrandingThemeID"] = strings.TrimSpace(branding)
 		}
 		if reference, _ := cmd.Flags().GetString("reference"); strings.TrimSpace(reference) != "" {
-			invoice["Reference"] = strings.TrimSpace(reference)
+			ref := strings.TrimSpace(reference)
+			invType := ""
+			if raw, ok := invoice["Type"].(string); ok {
+				invType = strings.ToUpper(strings.TrimSpace(raw))
+			}
+			if invType == "" {
+				invType = strings.ToUpper(invoiceType)
+			}
+			if invType == "ACCPAY" {
+				invoice["InvoiceNumber"] = ref
+			} else {
+				invoice["Reference"] = ref
+			}
 		}
 
 		payload, err := json.Marshal(map[string]any{"Invoices": []any{invoice}})
