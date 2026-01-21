@@ -8,6 +8,7 @@ A command-line interface for interacting with the Xero API, modeled after the Gi
 - **Automatic Token Refresh** - No need to re-authenticate frequently
 - **Secure Credential Storage** - Credentials stored locally with proper permissions
 - **Invoice Management** - List, filter, and manage invoices
+- **Payments** - List, create, and delete invoice payments
 - **Banking** - Create bank transactions and list bank accounts
 - **Clean CLI Interface** - Inspired by GitHub CLI's user-friendly design
 - **No External Runtime Dependencies** - Uses Go's standard library
@@ -152,6 +153,62 @@ Provide a contact by name (`--contact`) or ID (`--contact-id`). For advanced cas
 xero invoices update <invoice_id> \
   --status AUTHORISED \
   --reference "Updated reference"
+```
+
+---
+
+### Payments Commands
+
+#### List Payments
+```bash
+xero payments list
+```
+
+Optional filters:
+```bash
+--where 'Status=="AUTHORISED"'
+--order "Date DESC"
+--page 2 --page-size 50
+--if-modified-since "2025-01-01T00:00:00Z"
+```
+
+#### Get a Payment
+```bash
+xero payments get <payment_id>
+```
+
+#### Create a Payment (Invoice)
+```bash
+xero payments create \
+  --invoice-id <invoice_id> \
+  --account-id <bank_account_id> \
+  --amount 125.50 \
+  --date 2025-01-15 \
+  --reference "Card payment"
+```
+
+#### Create Multiple Payments (via --body)
+```bash
+xero payments create --body '{
+  "Payments": [
+    {
+      "Invoice": { "InvoiceID": "<invoice_id>" },
+      "Account": { "AccountID": "<bank_account_id>" },
+      "Amount": 125.50,
+      "Date": "2025-01-15"
+    }
+  ]
+}'
+```
+
+#### Delete a Payment
+```bash
+xero payments delete <payment_id>
+```
+
+#### Update a Payment (Delete)
+```bash
+xero payments update <payment_id> --status DELETED
 ```
 
 ---

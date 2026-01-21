@@ -22,7 +22,7 @@ var paymentsCreateCmd = &cobra.Command{
 			return err
 		}
 
-		bodyAttrs, err := parsePaymentBody(cmd)
+		bodyAttrs, err := parsePaymentBodyRaw(cmd)
 		if err != nil {
 			return err
 		}
@@ -43,104 +43,144 @@ var paymentsCreateCmd = &cobra.Command{
 		reference = strings.TrimSpace(reference)
 		paymentType = strings.TrimSpace(paymentType)
 
-		payment := cloneMap(bodyAttrs)
+		var payment map[string]any
+		var payload []byte
+		batchPayload := false
 
-		targetCount := 0
-		if invoiceID != "" {
-			targetCount++
-		}
-		if creditNoteID != "" {
-			targetCount++
-		}
-		if prepaymentID != "" {
-			targetCount++
-		}
-		if overpaymentID != "" {
-			targetCount++
-		}
-		if targetCount > 1 {
-			return errors.New("use only one of --invoice-id, --credit-note-id, --prepayment-id, or --overpayment-id")
-		}
-
-		switch {
-		case invoiceID != "":
-			payment["Invoice"] = map[string]any{"InvoiceID": invoiceID}
-		case creditNoteID != "":
-			payment["CreditNote"] = map[string]any{"CreditNoteID": creditNoteID}
-		case prepaymentID != "":
-			payment["Prepayment"] = map[string]any{"PrepaymentID": prepaymentID}
-		case overpaymentID != "":
-			payment["Overpayment"] = map[string]any{"OverpaymentID": overpaymentID}
-		}
-
-		if accountID != "" {
-			payment["Account"] = map[string]any{"AccountID": accountID}
-		}
-
-		if cmd.Flags().Changed("amount") {
-			amount, _ := cmd.Flags().GetFloat64("amount")
-			if amount <= 0 {
-				return errors.New("--amount must be greater than 0")
+		if bodyAttrs != nil {
+			switch value := bodyAttrs.(type) {
+			case map[string]any:
+				if normalizePaymentsWrapper(value) {
+					if paymentFlagsSet(cmd) {
+						return errors.New("--body Payments cannot be combined with payment flags")
+					}
+					payload, err = json.Marshal(value)
+					if err != nil {
+						return fmt.Errorf("failed to build payments payload: %w", err)
+					}
+					batchPayload = true
+				} else {
+					payment = cloneMap(value)
+				}
+			case []any:
+				if paymentFlagsSet(cmd) {
+					return errors.New("--body array cannot be combined with payment flags")
+				}
+				payload, err = json.Marshal(map[string]any{"Payments": value})
+				if err != nil {
+					return fmt.Errorf("failed to build payments payload: %w", err)
+				}
+				batchPayload = true
+			default:
+				return errors.New("--body must be a JSON object or array")
 			}
-			payment["Amount"] = amount
 		}
 
-		if cmd.Flags().Changed("date") {
-			dateFlag, _ := cmd.Flags().GetString("date")
-			dateFlag = strings.TrimSpace(dateFlag)
-			if dateFlag == "" {
-				return errors.New("--date cannot be empty")
+		if payment == nil && !batchPayload {
+			payment = map[string]any{}
+		}
+
+		if !batchPayload {
+			targetCount := 0
+			if invoiceID != "" {
+				targetCount++
 			}
-			if _, err := time.Parse("2006-01-02", dateFlag); err != nil {
-				return errors.New("invalid --date; expected YYYY-MM-DD")
+			if creditNoteID != "" {
+				targetCount++
 			}
-			payment["Date"] = dateFlag
-		}
-
-		if cmd.Flags().Changed("reference") {
-			if reference == "" {
-				return errors.New("--reference cannot be empty")
+			if prepaymentID != "" {
+				targetCount++
 			}
-			payment["Reference"] = reference
-		}
-
-		if cmd.Flags().Changed("currency-rate") {
-			rate, _ := cmd.Flags().GetFloat64("currency-rate")
-			if rate <= 0 {
-				return errors.New("--currency-rate must be greater than 0")
+			if overpaymentID != "" {
+				targetCount++
 			}
-			payment["CurrencyRate"] = rate
-		}
-
-		if cmd.Flags().Changed("payment-type") {
-			if paymentType == "" {
-				return errors.New("--payment-type cannot be empty")
+			if targetCount > 1 {
+				return errors.New("use only one of --invoice-id, --credit-note-id, --prepayment-id, or --overpayment-id")
 			}
-			payment["PaymentType"] = paymentType
-		}
 
-		if cmd.Flags().Changed("is-reconciled") {
-			isReconciled, _ := cmd.Flags().GetBool("is-reconciled")
-			payment["IsReconciled"] = isReconciled
-		}
+			switch {
+			case invoiceID != "":
+				payment["Invoice"] = map[string]any{"InvoiceID": invoiceID}
+			case creditNoteID != "":
+				payment["CreditNote"] = map[string]any{"CreditNoteID": creditNoteID}
+			case prepaymentID != "":
+				payment["Prepayment"] = map[string]any{"PrepaymentID": prepaymentID}
+			case overpaymentID != "":
+				payment["Overpayment"] = map[string]any{"OverpaymentID": overpaymentID}
+			}
 
-		if !hasPaymentTarget(payment) {
-			return errors.New("payment target is required (invoice, credit note, prepayment, or overpayment)")
-		}
-		if !hasKey(payment, "Account") {
-			return errors.New("--account-id is required (or provide Account in --body)")
-		}
-		if !hasKey(payment, "Amount") {
-			return errors.New("--amount is required (or provide Amount in --body)")
-		}
+			if accountID != "" {
+				payment["Account"] = map[string]any{"AccountID": accountID}
+			}
 
-		payload, err := json.Marshal(payment)
-		if err != nil {
-			return fmt.Errorf("failed to build payment payload: %w", err)
+			if cmd.Flags().Changed("amount") {
+				amount, _ := cmd.Flags().GetFloat64("amount")
+				if amount <= 0 {
+					return errors.New("--amount must be greater than 0")
+				}
+				payment["Amount"] = amount
+			}
+
+			if cmd.Flags().Changed("date") {
+				dateFlag, _ := cmd.Flags().GetString("date")
+				dateFlag = strings.TrimSpace(dateFlag)
+				if dateFlag == "" {
+					return errors.New("--date cannot be empty")
+				}
+				if _, err := time.Parse("2006-01-02", dateFlag); err != nil {
+					return errors.New("invalid --date; expected YYYY-MM-DD")
+				}
+				payment["Date"] = dateFlag
+			}
+
+			if cmd.Flags().Changed("reference") {
+				if reference == "" {
+					return errors.New("--reference cannot be empty")
+				}
+				payment["Reference"] = reference
+			}
+
+			if cmd.Flags().Changed("currency-rate") {
+				rate, _ := cmd.Flags().GetFloat64("currency-rate")
+				if rate <= 0 {
+					return errors.New("--currency-rate must be greater than 0")
+				}
+				payment["CurrencyRate"] = rate
+			}
+
+			if cmd.Flags().Changed("payment-type") {
+				if paymentType == "" {
+					return errors.New("--payment-type cannot be empty")
+				}
+				payment["PaymentType"] = paymentType
+			}
+
+			if cmd.Flags().Changed("is-reconciled") {
+				isReconciled, _ := cmd.Flags().GetBool("is-reconciled")
+				payment["IsReconciled"] = isReconciled
+			}
+
+			if !hasPaymentTarget(payment) {
+				return errors.New("payment target is required (invoice, credit note, prepayment, or overpayment)")
+			}
+			if !hasKey(payment, "Account") {
+				return errors.New("--account-id is required (or provide Account in --body)")
+			}
+			if !hasKey(payment, "Amount") {
+				return errors.New("--amount is required (or provide Amount in --body)")
+			}
+
+			payload, err = json.Marshal(payment)
+			if err != nil {
+				return fmt.Errorf("failed to build payment payload: %w", err)
+			}
 		}
 
 		params := url.Values{}
 		if cmd.Flags().Changed("summarize-errors") {
+			if !batchPayload {
+				return errors.New("--summarize-errors requires a Payments array in --body")
+			}
 			summarize, _ := cmd.Flags().GetBool("summarize-errors")
 			params.Set("summarizeErrors", fmt.Sprintf("%t", summarize))
 		}
@@ -193,12 +233,12 @@ func init() {
 	paymentsCreateCmd.Flags().Float64("currency-rate", 0, "Currency rate for the payment")
 	paymentsCreateCmd.Flags().String("payment-type", "", "Payment type for the payment")
 	paymentsCreateCmd.Flags().Bool("is-reconciled", false, "Whether the payment is reconciled")
-	paymentsCreateCmd.Flags().String("body", "", "Raw JSON object of payment attributes")
+	paymentsCreateCmd.Flags().String("body", "", "Raw JSON object of payment attributes or a Payments array")
 	paymentsCreateCmd.Flags().Bool("summarize-errors", false, "Summarize validation errors in the response")
 	paymentsCreateCmd.Flags().String("idempotency-key", "", "Idempotency key for safely retrying requests")
 }
 
-func parsePaymentBody(cmd *cobra.Command) (map[string]any, error) {
+func parsePaymentBodyRaw(cmd *cobra.Command) (any, error) {
 	body, _ := cmd.Flags().GetString("body")
 	if strings.TrimSpace(body) == "" {
 		return nil, nil
@@ -209,9 +249,25 @@ func parsePaymentBody(cmd *cobra.Command) (map[string]any, error) {
 		return nil, fmt.Errorf("invalid --body JSON: %w", err)
 	}
 
-	obj, ok := decoded.(map[string]any)
+	switch decoded.(type) {
+	case map[string]any, []any:
+		return decoded, nil
+	default:
+		return nil, errors.New("--body must be a JSON object or array")
+	}
+}
+
+func parsePaymentBodyObject(cmd *cobra.Command) (map[string]any, error) {
+	body, err := parsePaymentBodyRaw(cmd)
+	if err != nil || body == nil {
+		return nil, err
+	}
+	obj, ok := body.(map[string]any)
 	if !ok {
 		return nil, errors.New("--body must be a JSON object")
+	}
+	if normalizePaymentsWrapper(obj) {
+		return nil, errors.New("--body must be a single Payment object, not Payments")
 	}
 	return obj, nil
 }
@@ -224,4 +280,30 @@ func hasPaymentTarget(payment map[string]any) bool {
 		hasKey(payment, "CreditNote") ||
 		hasKey(payment, "Prepayment") ||
 		hasKey(payment, "Overpayment")
+}
+
+func normalizePaymentsWrapper(value map[string]any) bool {
+	if hasKey(value, "Payments") {
+		return true
+	}
+	if payments, ok := value["payments"]; ok {
+		value["Payments"] = payments
+		delete(value, "payments")
+		return true
+	}
+	return false
+}
+
+func paymentFlagsSet(cmd *cobra.Command) bool {
+	return cmd.Flags().Changed("invoice-id") ||
+		cmd.Flags().Changed("credit-note-id") ||
+		cmd.Flags().Changed("prepayment-id") ||
+		cmd.Flags().Changed("overpayment-id") ||
+		cmd.Flags().Changed("account-id") ||
+		cmd.Flags().Changed("amount") ||
+		cmd.Flags().Changed("date") ||
+		cmd.Flags().Changed("reference") ||
+		cmd.Flags().Changed("currency-rate") ||
+		cmd.Flags().Changed("payment-type") ||
+		cmd.Flags().Changed("is-reconciled")
 }

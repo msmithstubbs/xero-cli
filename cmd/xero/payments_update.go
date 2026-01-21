@@ -27,7 +27,7 @@ var paymentsUpdateCmd = &cobra.Command{
 			return errors.New("payment_id is required")
 		}
 
-		bodyAttrs, err := parsePaymentBody(cmd)
+		bodyAttrs, err := parsePaymentBodyObject(cmd)
 		if err != nil {
 			return err
 		}
@@ -43,8 +43,16 @@ var paymentsUpdateCmd = &cobra.Command{
 			payment["Status"] = strings.ToUpper(status)
 		}
 
-		if len(payment) == 0 {
-			return errors.New("no payment fields provided; use --status or --body")
+		if raw, ok := payment["Status"].(string); ok && strings.TrimSpace(raw) != "" {
+			status := strings.ToUpper(strings.TrimSpace(raw))
+			if status != "DELETED" {
+				return errors.New("only Status=DELETED is supported for payments")
+			}
+			payment["Status"] = status
+		}
+
+		if len(payment) == 0 || !hasKey(payment, "Status") {
+			return errors.New("payment status is required; use --status DELETED or --body")
 		}
 
 		payload, err := json.Marshal(payment)
