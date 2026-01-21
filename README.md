@@ -163,6 +163,10 @@ xero invoices update <invoice_id> \
 ```bash
 xero contacts list
 ```
+Pagination:
+```bash
+--page 2 --page-size 50
+```
 
 #### Get a Contact
 ```bash
