@@ -30,6 +30,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&tenantOverride, "tenant-id", "", "Tenant ID to use for this request")
 	rootCmd.PersistentFlags().StringVar(&outputFormat, "output", outputAuto, "Output format: auto, table, json, jsonl")
 	rootCmd.PersistentFlags().StringVar(&fieldsFlag, "fields", "", "Comma-separated field paths to include in JSON output")
+	rootCmd.PersistentFlags().BoolVar(&redactOutput, "redact", true, "Redact sensitive fields from machine-readable output")
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Preview mutating requests without sending them")
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(invoicesCmd)

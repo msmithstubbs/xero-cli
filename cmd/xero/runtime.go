@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -29,6 +30,7 @@ var (
 	outputFormat string
 	fieldsFlag   string
 	dryRun       bool
+	redactOutput bool = true
 	stdoutWriter io.Writer = os.Stdout
 	stderrWriter io.Writer = os.Stderr
 )
@@ -181,7 +183,10 @@ func emitDataWithMode(data any, renderTable func(), mode string) error {
 		}
 		return writeJSON(stdoutWriter, selected, true)
 	case outputJSON:
-		return writeJSON(stdoutWriter, selected, false)
+		return writeJSON(stdoutWriter, map[string]any{
+			"ok":   true,
+			"data": selected,
+		}, false)
 	case outputJSONL:
 		return writeJSONL(stdoutWriter, selected)
 	default:
@@ -199,8 +204,7 @@ func emitJSONBody(body []byte, renderTable func(data any)) error {
 	if parsed != nil {
 		return emitData(parsed, nil)
 	}
-	fmt.Fprintln(stdoutWriter, raw)
-	return nil
+	return emitData(raw, nil)
 }
 
 func decodeBody(body []byte) (any, string) {
@@ -218,16 +222,17 @@ func decodeBody(body []byte) (any, string) {
 func applyFieldSelection(data any) any {
 	fields := parseFields(fieldsFlag)
 	if len(fields) == 0 {
-		return data
+		return sanitizeValue(data)
 	}
 
+	sanitized := sanitizeValue(data)
 	if len(fields) == 1 {
-		return lookupField(data, fields[0])
+		return lookupField(sanitized, fields[0])
 	}
 
 	selected := make(map[string]any, len(fields))
 	for _, field := range fields {
-		selected[field] = lookupField(data, field)
+		selected[field] = lookupField(sanitized, field)
 	}
 	return selected
 }
@@ -284,15 +289,24 @@ func writeJSONL(w io.Writer, data any) error {
 func sanitizeBody(body []byte) any {
 	parsed, raw := decodeBody(body)
 	if parsed != nil {
-		return parsed
+		return sanitizeValue(parsed)
 	}
 	if raw == "" {
 		return nil
+	}
+	if !utf8.ValidString(raw) {
+		return map[string]any{
+			"format":     "binary",
+			"size_bytes": len(body),
+		}
 	}
 	return raw
 }
 
 func sanitizeHeaders(headers map[string]string) map[string]string {
+	if !redactOutput {
+		return headers
+	}
 	if headers == nil {
 		return nil
 	}
@@ -307,6 +321,42 @@ func sanitizeHeaders(headers map[string]string) map[string]string {
 		}
 	}
 	return sanitized
+}
+
+func sanitizeValue(value any) any {
+	if !redactOutput {
+		return value
+	}
+
+	switch typed := value.(type) {
+	case map[string]any:
+		sanitized := make(map[string]any, len(typed))
+		for key, item := range typed {
+			if isSensitiveKey(key) {
+				sanitized[key] = "REDACTED"
+				continue
+			}
+			sanitized[key] = sanitizeValue(item)
+		}
+		return sanitized
+	case []any:
+		sanitized := make([]any, 0, len(typed))
+		for _, item := range typed {
+			sanitized = append(sanitized, sanitizeValue(item))
+		}
+		return sanitized
+	default:
+		return value
+	}
+}
+
+func isSensitiveKey(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "authorization", "access_token", "refreshtoken", "refresh_token", "clientid", "client_id", "pkce_verifier", "pkceverifier":
+		return true
+	default:
+		return false
+	}
 }
 
 func emitDryRun(method, endpoint string, headers map[string]string, body []byte) error {

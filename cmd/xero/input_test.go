@@ -78,7 +78,8 @@ func TestExecuteMutationDryRun(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &decoded); err != nil {
 		t.Fatalf("failed to decode dry run output: %v", err)
 	}
-	if decoded["dry_run"] != true {
-		t.Fatalf("expected dry_run=true, got %#v", decoded["dry_run"])
+	data := decoded["data"].(map[string]any)
+	if data["dry_run"] != true {
+		t.Fatalf("expected dry_run=true, got %#v", data["dry_run"])
 	}
 }
