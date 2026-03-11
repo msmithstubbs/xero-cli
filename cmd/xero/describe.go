@@ -135,6 +135,8 @@ func collectFlags(cmd *cobra.Command) []flagDescription {
 func isMutatingCommand(cmd *cobra.Command) bool {
 	switch cmd.CommandPath() {
 	case "xero contacts create",
+		"xero auth import",
+		"xero auth logout",
 		"xero invoices attach",
 		"xero invoices create",
 		"xero invoices update",
@@ -162,6 +164,8 @@ func envVarsForCommand(cmd *cobra.Command) []string {
 	switch cmd.CommandPath() {
 	case "xero auth login":
 		envs = append(envs, "XERO_CLIENT_ID", "XERO_PKCE_VERIFIER")
+	case "xero auth import":
+		envs = append(envs, "XERO_ACCESS_TOKEN", "XERO_CLIENT_ID", "XERO_EXPIRES_IN", "XERO_OBTAINED_AT", "XERO_REFRESH_TOKEN")
 	}
 
 	if strings.HasPrefix(cmd.CommandPath(), "xero auth") || strings.HasPrefix(cmd.CommandPath(), "xero describe") || strings.HasPrefix(cmd.CommandPath(), "xero tenants") {

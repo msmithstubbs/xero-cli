@@ -192,7 +192,7 @@ func postForm(url string, form url.Values) (*TokenData, error) {
 	return &data, nil
 }
 
-func generateCodeVerifier() (string, error) {
+func GenerateCodeVerifier() (string, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
 		return "", err

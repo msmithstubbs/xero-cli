@@ -13,6 +13,20 @@ A command-line interface for interacting with the Xero API, modeled after the Gi
 - **Clean CLI Interface** - Inspired by GitHub CLI's user-friendly design
 - **No External Runtime Dependencies** - Uses Go's standard library
 
+## Automation and Agents
+
+The CLI now exposes a machine-readable interface in addition to the human-friendly table output:
+
+```bash
+xero describe payments create
+xero invoices list --output json
+xero payments list --output jsonl --fields Payments
+xero invoices create --dry-run --output json
+xero contacts create --input-file contact.json --output json
+```
+
+Guidance for agent-driven usage lives in `CONTEXT.md`.
+
 ## Prerequisites
 
 - Go 1.22 or higher
@@ -66,12 +80,9 @@ Run the login command and follow the prompts:
 xero auth login
 ```
 
-You'll be asked to:
-1. Enter your Xero Client ID
-2. Authorize the application in your browser
-3. The CLI will automatically capture the OAuth callback
+The CLI can take the client ID from `--client-id`, `XERO_CLIENT_ID`, or saved local config. It generates a PKCE verifier automatically if one is not already stored.
 
-Your client ID, PKCE verifier, and tokens are stored in `~/.config/zero-cli/tunnel`.
+Your client ID, PKCE verifier, and tokens are stored in `~/.config/xero-cli/credentials.toml`.
 
 ## Usage
 
@@ -79,6 +90,10 @@ Your client ID, PKCE verifier, and tokens are stored in `~/.config/zero-cli/tunn
 
 ```bash
 --tenant-id <tenant_id>  Tenant ID for the request (required for tenant-scoped commands)
+--output <mode>         auto, table, json, jsonl
+--fields <paths>        Comma-separated JSON field paths
+--redact <bool>         Redact sensitive fields from machine-readable output
+--dry-run               Preview mutating requests without sending them
 ```
 
 Tenant-scoped commands require a tenant ID. Provide it via the `--tenant-id` flag or set `XERO_TENANT_ID`. If both are set, `--tenant-id` takes precedence.
@@ -88,9 +103,34 @@ Tenant-scoped commands require a tenant ID. Provide it via the `--tenant-id` fla
 #### Login to Xero
 ```bash
 xero auth login
+xero auth login --client-id <client_id> --no-browser
 ```
 
 Starts the OAuth 2.0 authentication flow. Opens your browser automatically and waits for authorization.
+
+Environment variables:
+
+```bash
+XERO_CLIENT_ID=<client_id> xero auth login
+XERO_PKCE_VERIFIER=<verifier> xero auth login --no-browser
+```
+
+#### Import Credentials
+```bash
+xero auth import \
+  --client-id <client_id> \
+  --access-token <access_token> \
+  --refresh-token <refresh_token>
+```
+
+Environment variables:
+
+```bash
+XERO_CLIENT_ID=... \
+XERO_ACCESS_TOKEN=... \
+XERO_REFRESH_TOKEN=... \
+xero auth import
+```
 
 #### Check Authentication Status
 ```bash
@@ -147,6 +187,14 @@ xero invoices create \
 ```
 
 Provide a contact by name (`--contact`) or ID (`--contact-id`). For advanced cases, pass a raw JSON invoice object via `--body`.
+
+Structured input also supports:
+
+```bash
+xero invoices create --input '{"Contact":{"Name":"Acme"},"LineItems":[...]}'
+xero invoices create --input-file invoice.json
+xero invoices create --input-file - < invoice.json
+```
 
 #### Update an Invoice
 ```bash
@@ -224,6 +272,8 @@ xero payments create --body '{
 }'
 ```
 
+Structured input also supports `--input` and `--input-file`.
+
 #### Delete a Payment
 ```bash
 xero payments delete <payment_id>
@@ -241,6 +291,7 @@ xero payments update <payment_id> --status DELETED
 #### Create Bank Transactions
 ```bash
 xero banking transactions --file banktransactions.json
+xero banking transactions --input-file banktransactions.json
 ```
 
 Optional flags:
@@ -352,7 +403,7 @@ $ xero invoices list --status AUTHORISED
 
 ## Configuration
 
-The CLI stores the Client ID and PKCE verifier in `~/.config/zero-cli/tunnel` and will prompt for them if missing.
+The CLI stores the Client ID, PKCE verifier, access token, and refresh token in `~/.config/xero-cli/credentials.toml`.
 
 Tenant-scoped commands require a tenant ID. You can set it once per shell:
 
@@ -384,14 +435,14 @@ xero-cli/
 2. **User Authorization**: Opens browser for user to authorize
 3. **Callback Server**: Starts a local server on port 8888 to receive the callback
 4. **Token Exchange**: Exchanges authorization code for access and refresh tokens
-5. **Token Storage**: Stores credentials in `~/.config/zero-cli/tunnel`
+5. **Token Storage**: Stores credentials in `~/.config/xero-cli/credentials.toml`
 6. **Automatic Refresh**: Refreshes tokens automatically when expired
 
 ### Security Features
 
 - **PKCE**: Uses Proof Key for Code Exchange for enhanced OAuth security
 - **Token Expiration**: Tracks token expiration and refreshes automatically
-- **Secure Storage**: Client ID, PKCE verifier, access, and refresh tokens are stored in `~/.config/zero-cli/tunnel`
+- **Secure Storage**: Client ID, PKCE verifier, access, and refresh tokens are stored in `~/.config/xero-cli/credentials.toml`
 - **No Client Secret**: Designed for public OAuth clients (no client secret needed)
 
 ## Development
