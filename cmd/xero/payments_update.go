@@ -2,12 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/msmithstubbs/xero-cli/internal/auth"
-	"github.com/msmithstubbs/xero-cli/internal/xero"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +22,7 @@ var paymentsUpdateCmd = &cobra.Command{
 
 		paymentID := strings.TrimSpace(args[0])
 		if paymentID == "" {
-			return errors.New("payment_id is required")
+			return validationError("payment_id is required")
 		}
 
 		bodyAttrs, err := parsePaymentBodyObject(cmd)
@@ -38,7 +36,7 @@ var paymentsUpdateCmd = &cobra.Command{
 			status, _ := cmd.Flags().GetString("status")
 			status = strings.TrimSpace(status)
 			if status == "" {
-				return errors.New("--status cannot be empty")
+				return validationError("--status cannot be empty")
 			}
 			payment["Status"] = strings.ToUpper(status)
 		}
@@ -46,13 +44,13 @@ var paymentsUpdateCmd = &cobra.Command{
 		if raw, ok := payment["Status"].(string); ok && strings.TrimSpace(raw) != "" {
 			status := strings.ToUpper(strings.TrimSpace(raw))
 			if status != "DELETED" {
-				return errors.New("only Status=DELETED is supported for payments")
+				return validationError("only Status=DELETED is supported for payments")
 			}
 			payment["Status"] = status
 		}
 
 		if len(payment) == 0 || !hasKey(payment, "Status") {
-			return errors.New("payment status is required; use --status DELETED or --body")
+			return validationError("payment status is required; use --status DELETED or --body")
 		}
 
 		payload, err := json.Marshal(payment)
@@ -69,31 +67,14 @@ var paymentsUpdateCmd = &cobra.Command{
 			headers["Idempotency-Key"] = strings.TrimSpace(idempotency)
 		}
 
-		client := xero.NewClient(xeroAPIBase)
 		endpoint := fmt.Sprintf("%s/Payments/%s", xeroAPIBase, paymentID)
-		statusCode, body, err := client.Do("POST", endpoint, headers, payload)
-		if err != nil {
-			return err
-		}
-		if statusCode == 401 {
-			return errors.New("authentication failed. Please run 'xero auth login' again")
-		}
-		if statusCode < 200 || statusCode >= 300 {
-			return fmt.Errorf("API request failed with status %d: %s", statusCode, string(body))
-		}
-
-		formatted, err := prettyJSON(body)
-		if err != nil {
-			fmt.Println(string(body))
-			return nil
-		}
-		fmt.Println(formatted)
-		return nil
+		return executeMutation("POST", endpoint, headers, payload, "")
 	},
 }
 
 func init() {
 	paymentsUpdateCmd.Flags().String("status", "", "Payment status (Xero supports DELETED)")
+	addStructuredInputFlags(paymentsUpdateCmd, "Raw JSON object of payment attributes")
 	paymentsUpdateCmd.Flags().String("body", "", "Raw JSON object of payment attributes")
 	paymentsUpdateCmd.Flags().String("idempotency-key", "", "Idempotency key for safely retrying requests")
 }

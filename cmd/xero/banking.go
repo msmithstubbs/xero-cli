@@ -30,12 +30,15 @@ var bankingTransactionsCmd = &cobra.Command{
 			return err
 		}
 
-		filePath, _ := cmd.Flags().GetString("file")
-		if filePath == "" {
+		inputPath, err := readBinaryInputPath(cmd)
+		if err != nil {
+			return err
+		}
+		if inputPath == "" {
 			return validationError("--file is required")
 		}
 
-		payload, err := buildBankTransactionsPayload(filePath)
+		payload, err := buildBankTransactionsPayload(inputPath)
 		if err != nil {
 			return err
 		}
@@ -66,26 +69,7 @@ var bankingTransactionsCmd = &cobra.Command{
 			headers["Idempotency-Key"] = idempotency
 		}
 
-		client := xero.NewClient(xeroAPIBase)
-		status, body, err := client.Do("POST", endpoint, headers, payload)
-		if err != nil {
-			return err
-		}
-
-		if status == 401 {
-			return authenticationExpiredError()
-		}
-		if status < 200 || status >= 300 {
-			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
-		}
-
-		formatted, err := prettyJSON(body)
-		if err != nil {
-			fmt.Println(string(body))
-			return nil
-		}
-		fmt.Println(formatted)
-		return nil
+		return executeMutation("POST", endpoint, headers, payload, "")
 	},
 }
 
@@ -261,6 +245,7 @@ func init() {
 	bankingTransactionsCmd.AddCommand(bankingTransactionsGetCmd)
 	bankingCmd.AddCommand(bankingListAccountsCmd)
 	bankingTransactionsCmd.Flags().String("file", "", "Path to JSON file containing bank transactions")
+	bankingTransactionsCmd.Flags().String("input-file", "", "Path to a JSON file, or '-' to read JSON from stdin")
 	bankingTransactionsCmd.Flags().Bool("summarize-errors", false, "Summarize validation errors in the response")
 	bankingTransactionsCmd.Flags().Int("unitdp", 0, "Unit decimal places for line items")
 	bankingTransactionsCmd.Flags().String("idempotency-key", "", "Idempotency key for safe retries")

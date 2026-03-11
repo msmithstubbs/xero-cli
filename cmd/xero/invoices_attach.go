@@ -27,13 +27,16 @@ var invoicesAttachCmd = &cobra.Command{
 
 		invoiceID := strings.TrimSpace(args[0])
 		if invoiceID == "" {
-			return errors.New("invoice_id is required")
+			return validationError("invoice_id is required")
 		}
 
-		filePath, _ := cmd.Flags().GetString("file")
+		filePath, err := readBinaryInputPath(cmd)
+		if err != nil {
+			return err
+		}
 		filePath = strings.TrimSpace(filePath)
 		if filePath == "" {
-			return errors.New("--file is required")
+			return validationError("--file is required")
 		}
 
 		name, _ := cmd.Flags().GetString("name")
@@ -55,42 +58,47 @@ var invoicesAttachCmd = &cobra.Command{
 		}
 		headers["content-type"] = "application/pdf"
 
+		if dryRun {
+			return emitDryRun("POST", endpoint, headers, attachment)
+		}
+
 		client := xero.NewClient(xeroAPIBase)
 		status, body, err := client.Do("POST", endpoint, headers, attachment)
 		if err != nil {
-			return err
+			return internalError("request failed", err)
 		}
 
 		verbose, _ := cmd.Flags().GetBool("verbose")
 		if verbose {
-			fmt.Printf("HTTP Status: %d\nResponse: %s\n", status, string(body))
+			fmt.Fprintf(stdoutWriter, "HTTP Status: %d\nResponse: %s\n", status, string(body))
 		}
 
 		if status == 401 {
-			return fmt.Errorf("authentication failed (status 401). Response: %s\nPlease run 'xero auth login' again", string(body))
+			return authenticationExpiredError()
 		}
 		if status < 200 || status >= 300 {
-			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
+			return apiError(status, body)
 		}
 
 		if len(body) == 0 {
-			fmt.Printf("Attachment %s uploaded.\n", attachmentName)
-			return nil
+			message := fmt.Sprintf("Attachment %s uploaded.", attachmentName)
+			if resolvedOutputFormat() == outputTable {
+				fmt.Fprintln(stdoutWriter, message)
+				return nil
+			}
+			return emitData(map[string]any{
+				"ok":      true,
+				"message": message,
+			}, nil)
 		}
-
-		formatted, err := prettyJSON(body)
-		if err != nil {
-			fmt.Println(string(body))
-			return nil
-		}
-		fmt.Println(formatted)
-		return nil
+		return emitJSONBody(body, nil)
 	},
 }
 
 func init() {
 	invoicesCmd.AddCommand(invoicesAttachCmd)
 	invoicesAttachCmd.Flags().String("file", "", "Path to PDF file to attach")
+	invoicesAttachCmd.Flags().String("input-file", "", "Path to a PDF file, or '-' to read a PDF from stdin")
 	invoicesAttachCmd.Flags().String("name", "", "Attachment file name (defaults to the PDF base name)")
 	invoicesAttachCmd.Flags().Bool("verbose", false, "Print raw API response to stdout")
 }

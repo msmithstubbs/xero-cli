@@ -2,14 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/msmithstubbs/xero-cli/internal/auth"
-	"github.com/msmithstubbs/xero-cli/internal/xero"
 	"github.com/spf13/cobra"
 )
 
@@ -49,11 +47,11 @@ var paymentsCreateCmd = &cobra.Command{
 
 		if bodyAttrs != nil {
 			switch value := bodyAttrs.(type) {
-			case map[string]any:
-				if normalizePaymentsWrapper(value) {
-					if paymentFlagsSet(cmd) {
-						return errors.New("--body Payments cannot be combined with payment flags")
-					}
+				case map[string]any:
+					if normalizePaymentsWrapper(value) {
+						if paymentFlagsSet(cmd) {
+							return validationError("--body Payments cannot be combined with payment flags")
+						}
 					payload, err = json.Marshal(value)
 					if err != nil {
 						return fmt.Errorf("failed to build payments payload: %w", err)
@@ -62,19 +60,19 @@ var paymentsCreateCmd = &cobra.Command{
 				} else {
 					payment = cloneMap(value)
 				}
-			case []any:
-				if paymentFlagsSet(cmd) {
-					return errors.New("--body array cannot be combined with payment flags")
-				}
+				case []any:
+					if paymentFlagsSet(cmd) {
+						return validationError("--body array cannot be combined with payment flags")
+					}
 				payload, err = json.Marshal(map[string]any{"Payments": value})
 				if err != nil {
 					return fmt.Errorf("failed to build payments payload: %w", err)
 				}
 				batchPayload = true
-			default:
-				return errors.New("--body must be a JSON object or array")
+				default:
+					return validationError("input must be a JSON object or array")
+				}
 			}
-		}
 
 		if payment == nil && !batchPayload {
 			payment = map[string]any{}
@@ -95,7 +93,7 @@ var paymentsCreateCmd = &cobra.Command{
 				targetCount++
 			}
 			if targetCount > 1 {
-				return errors.New("use only one of --invoice-id, --credit-note-id, --prepayment-id, or --overpayment-id")
+				return validationError("use only one of --invoice-id, --credit-note-id, --prepayment-id, or --overpayment-id")
 			}
 
 			switch {
@@ -116,7 +114,7 @@ var paymentsCreateCmd = &cobra.Command{
 			if cmd.Flags().Changed("amount") {
 				amount, _ := cmd.Flags().GetFloat64("amount")
 				if amount <= 0 {
-					return errors.New("--amount must be greater than 0")
+					return validationError("--amount must be greater than 0")
 				}
 				payment["Amount"] = amount
 			}
@@ -125,17 +123,17 @@ var paymentsCreateCmd = &cobra.Command{
 				dateFlag, _ := cmd.Flags().GetString("date")
 				dateFlag = strings.TrimSpace(dateFlag)
 				if dateFlag == "" {
-					return errors.New("--date cannot be empty")
+					return validationError("--date cannot be empty")
 				}
 				if _, err := time.Parse("2006-01-02", dateFlag); err != nil {
-					return errors.New("invalid --date; expected YYYY-MM-DD")
+					return validationError("invalid --date; expected YYYY-MM-DD")
 				}
 				payment["Date"] = dateFlag
 			}
 
 			if cmd.Flags().Changed("reference") {
 				if reference == "" {
-					return errors.New("--reference cannot be empty")
+					return validationError("--reference cannot be empty")
 				}
 				payment["Reference"] = reference
 			}
@@ -143,14 +141,14 @@ var paymentsCreateCmd = &cobra.Command{
 			if cmd.Flags().Changed("currency-rate") {
 				rate, _ := cmd.Flags().GetFloat64("currency-rate")
 				if rate <= 0 {
-					return errors.New("--currency-rate must be greater than 0")
+					return validationError("--currency-rate must be greater than 0")
 				}
 				payment["CurrencyRate"] = rate
 			}
 
 			if cmd.Flags().Changed("payment-type") {
 				if paymentType == "" {
-					return errors.New("--payment-type cannot be empty")
+					return validationError("--payment-type cannot be empty")
 				}
 				payment["PaymentType"] = paymentType
 			}
@@ -161,13 +159,13 @@ var paymentsCreateCmd = &cobra.Command{
 			}
 
 			if !hasPaymentTarget(payment) {
-				return errors.New("payment target is required (invoice, credit note, prepayment, or overpayment)")
+				return validationError("payment target is required (invoice, credit note, prepayment, or overpayment)")
 			}
 			if !hasKey(payment, "Account") {
-				return errors.New("--account-id is required (or provide Account in --body)")
+				return validationError("--account-id is required (or provide Account in --body)")
 			}
 			if !hasKey(payment, "Amount") {
-				return errors.New("--amount is required (or provide Amount in --body)")
+				return validationError("--amount is required (or provide Amount in --body)")
 			}
 
 			payload, err = json.Marshal(payment)
@@ -179,7 +177,7 @@ var paymentsCreateCmd = &cobra.Command{
 		params := url.Values{}
 		if cmd.Flags().Changed("summarize-errors") {
 			if !batchPayload {
-				return errors.New("--summarize-errors requires a Payments array in --body")
+				return validationError("--summarize-errors requires a Payments array in --body")
 			}
 			summarize, _ := cmd.Flags().GetBool("summarize-errors")
 			params.Set("summarizeErrors", fmt.Sprintf("%t", summarize))
@@ -199,25 +197,7 @@ var paymentsCreateCmd = &cobra.Command{
 			headers["Idempotency-Key"] = strings.TrimSpace(idempotency)
 		}
 
-		client := xero.NewClient(xeroAPIBase)
-		status, body, err := client.Do("POST", endpoint, headers, payload)
-		if err != nil {
-			return err
-		}
-		if status == 401 {
-			return errors.New("authentication failed. Please run 'xero auth login' again")
-		}
-		if status < 200 || status >= 300 {
-			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
-		}
-
-		formatted, err := prettyJSON(body)
-		if err != nil {
-			fmt.Println(string(body))
-			return nil
-		}
-		fmt.Println(formatted)
-		return nil
+		return executeMutation("POST", endpoint, headers, payload, "")
 	},
 }
 
@@ -233,27 +213,23 @@ func init() {
 	paymentsCreateCmd.Flags().Float64("currency-rate", 0, "Currency rate for the payment")
 	paymentsCreateCmd.Flags().String("payment-type", "", "Payment type for the payment")
 	paymentsCreateCmd.Flags().Bool("is-reconciled", false, "Whether the payment is reconciled")
+	addStructuredInputFlags(paymentsCreateCmd, "Raw JSON object of payment attributes or a Payments array")
 	paymentsCreateCmd.Flags().String("body", "", "Raw JSON object of payment attributes or a Payments array")
 	paymentsCreateCmd.Flags().Bool("summarize-errors", false, "Summarize validation errors in the response")
 	paymentsCreateCmd.Flags().String("idempotency-key", "", "Idempotency key for safely retrying requests")
 }
 
 func parsePaymentBodyRaw(cmd *cobra.Command) (any, error) {
-	body, _ := cmd.Flags().GetString("body")
-	if strings.TrimSpace(body) == "" {
-		return nil, nil
-	}
-
-	var decoded any
-	if err := json.Unmarshal([]byte(body), &decoded); err != nil {
-		return nil, fmt.Errorf("invalid --body JSON: %w", err)
+	decoded, err := parseStructuredJSONInput(cmd)
+	if err != nil || decoded == nil {
+		return nil, err
 	}
 
 	switch decoded.(type) {
 	case map[string]any, []any:
 		return decoded, nil
 	default:
-		return nil, errors.New("--body must be a JSON object or array")
+		return nil, validationError("input must be a JSON object or array")
 	}
 }
 
@@ -264,10 +240,10 @@ func parsePaymentBodyObject(cmd *cobra.Command) (map[string]any, error) {
 	}
 	obj, ok := body.(map[string]any)
 	if !ok {
-		return nil, errors.New("--body must be a JSON object")
+		return nil, validationError("input must be a JSON object")
 	}
 	if normalizePaymentsWrapper(obj) {
-		return nil, errors.New("--body must be a single Payment object, not Payments")
+		return nil, validationError("input must be a single Payment object, not Payments")
 	}
 	return obj, nil
 }

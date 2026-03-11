@@ -2,13 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/msmithstubbs/xero-cli/internal/auth"
-	"github.com/msmithstubbs/xero-cli/internal/xero"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +22,7 @@ var invoicesUpdateCmd = &cobra.Command{
 
 		invoiceID := strings.TrimSpace(args[0])
 		if invoiceID == "" {
-			return errors.New("invoice_id is required")
+			return validationError("invoice_id is required")
 		}
 
 		bodyAttrs, err := parseInvoiceBody(cmd)
@@ -38,7 +36,7 @@ var invoicesUpdateCmd = &cobra.Command{
 		contactID = strings.TrimSpace(contactID)
 		contactFromBody, contactFromBodyOk := extractContact(bodyAttrs)
 		if contactName != "" && contactID != "" {
-			return errors.New("use either --contact or --contact-id, not both")
+			return validationError("use either --contact or --contact-id, not both")
 		}
 
 		invoice := cloneMap(bodyAttrs)
@@ -56,7 +54,7 @@ var invoicesUpdateCmd = &cobra.Command{
 		if cmd.Flags().Changed("type") {
 			invoiceType = strings.TrimSpace(invoiceType)
 			if invoiceType == "" {
-				return errors.New("--type cannot be empty")
+				return validationError("--type cannot be empty")
 			}
 			invoice["Type"] = strings.ToUpper(invoiceType)
 		}
@@ -83,10 +81,10 @@ var invoicesUpdateCmd = &cobra.Command{
 			cmd.Flags().Changed("line-unit-amount")
 		if lineFlagsSet {
 			if lineDesc == "" {
-				return errors.New("--line-description is required when line item fields are set")
+				return validationError("--line-description is required when line item fields are set")
 			}
 			if lineQty <= 0 || lineUnit <= 0 {
-				return errors.New("--line-quantity and --line-unit-amount must be greater than 0")
+				return validationError("--line-quantity and --line-unit-amount must be greater than 0")
 			}
 		}
 
@@ -116,28 +114,28 @@ var invoicesUpdateCmd = &cobra.Command{
 
 		if cmd.Flags().Changed("currency") {
 			if currency, _ := cmd.Flags().GetString("currency"); strings.TrimSpace(currency) == "" {
-				return errors.New("--currency cannot be empty")
+				return validationError("--currency cannot be empty")
 			} else {
 				invoice["CurrencyCode"] = strings.TrimSpace(currency)
 			}
 		}
 		if cmd.Flags().Changed("line-amount-types") {
 			if amountTypes, _ := cmd.Flags().GetString("line-amount-types"); strings.TrimSpace(amountTypes) == "" {
-				return errors.New("--line-amount-types cannot be empty")
+				return validationError("--line-amount-types cannot be empty")
 			} else {
 				invoice["LineAmountTypes"] = strings.TrimSpace(amountTypes)
 			}
 		}
 		if cmd.Flags().Changed("branding-theme-id") {
 			if branding, _ := cmd.Flags().GetString("branding-theme-id"); strings.TrimSpace(branding) == "" {
-				return errors.New("--branding-theme-id cannot be empty")
+				return validationError("--branding-theme-id cannot be empty")
 			} else {
 				invoice["BrandingThemeID"] = strings.TrimSpace(branding)
 			}
 		}
 		if cmd.Flags().Changed("reference") {
 			if reference, _ := cmd.Flags().GetString("reference"); strings.TrimSpace(reference) == "" {
-				return errors.New("--reference cannot be empty")
+				return validationError("--reference cannot be empty")
 			} else {
 				ref := strings.TrimSpace(reference)
 				invType := ""
@@ -153,7 +151,7 @@ var invoicesUpdateCmd = &cobra.Command{
 		}
 
 		if len(invoice) == 1 {
-			return errors.New("no invoice fields provided; use flags or --body")
+			return validationError("no invoice fields provided; use flags or --body")
 		}
 
 		payload, err := json.Marshal(map[string]any{"Invoices": []any{invoice}})
@@ -167,26 +165,8 @@ var invoicesUpdateCmd = &cobra.Command{
 		}
 		headers["content-type"] = "application/json"
 
-		client := xero.NewClient(xeroAPIBase)
 		endpoint := fmt.Sprintf("%s/Invoices", xeroAPIBase)
-		statusCode, body, err := client.Do("POST", endpoint, headers, payload)
-		if err != nil {
-			return err
-		}
-		if statusCode == 401 {
-			return errors.New("authentication failed. Please run 'xero auth login' again")
-		}
-		if statusCode < 200 || statusCode >= 300 {
-			return fmt.Errorf("API request failed with status %d: %s", statusCode, string(body))
-		}
-
-		formatted, err := prettyJSON(body)
-		if err != nil {
-			fmt.Println(string(body))
-			return nil
-		}
-		fmt.Println(formatted)
-		return nil
+		return executeMutation("POST", endpoint, headers, payload, "")
 	},
 }
 
@@ -199,6 +179,7 @@ func init() {
 	invoicesUpdateCmd.Flags().String("date", "", "Invoice date in YYYY-MM-DD")
 	invoicesUpdateCmd.Flags().String("due-date", "", "Due date in YYYY-MM-DD (overrides --due-in)")
 	invoicesUpdateCmd.Flags().Int("due-in", 0, "Number of days after today (or --date) for the due date")
+	addStructuredInputFlags(invoicesUpdateCmd, "Raw JSON object of invoice attributes")
 	invoicesUpdateCmd.Flags().String("body", "", "Raw JSON object of invoice attributes")
 	invoicesUpdateCmd.Flags().String("line-description", "", "Line item description")
 	invoicesUpdateCmd.Flags().Float64("line-quantity", 0, "Line item quantity")
@@ -247,7 +228,7 @@ func applyInvoiceUpdateDates(cmd *cobra.Command, invoice map[string]any) error {
 	if dueInChanged {
 		dueIn, _ := cmd.Flags().GetInt("due-in")
 		if dueIn <= 0 {
-			return errors.New("--due-in must be greater than 0")
+			return validationError("--due-in must be greater than 0")
 		}
 		dueDate := baseDate.AddDate(0, 0, dueIn)
 		invoice["DueDate"] = dueDate.Format("2006-01-02")

@@ -2,13 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/msmithstubbs/xero-cli/internal/auth"
-	"github.com/msmithstubbs/xero-cli/internal/xero"
 	"github.com/spf13/cobra"
 )
 
@@ -32,10 +30,10 @@ var invoicesCreateCmd = &cobra.Command{
 		contactID = strings.TrimSpace(contactID)
 		contactFromBody, contactFromBodyOk := extractContact(bodyAttrs)
 		if contactName != "" && contactID != "" {
-			return errors.New("use either --contact or --contact-id, not both")
+			return validationError("use either --contact or --contact-id, not both")
 		}
 		if contactName == "" && contactID == "" && !contactFromBodyOk {
-			return errors.New("--contact or --contact-id is required (or provide Contact in --body)")
+			return validationError("--contact or --contact-id is required (or provide Contact in --body)")
 		}
 
 		invoiceType, _ := cmd.Flags().GetString("type")
@@ -66,10 +64,10 @@ var invoicesCreateCmd = &cobra.Command{
 			cmd.Flags().Changed("line-unit-amount")
 		if lineFlagsSet {
 			if lineDesc == "" {
-				return errors.New("--line-description is required when line item fields are set")
+				return validationError("--line-description is required when line item fields are set")
 			}
 			if lineQty <= 0 || lineUnit <= 0 {
-				return errors.New("--line-quantity and --line-unit-amount must be greater than 0")
+				return validationError("--line-quantity and --line-unit-amount must be greater than 0")
 			}
 		}
 
@@ -127,7 +125,7 @@ var invoicesCreateCmd = &cobra.Command{
 		}
 
 		if len(extractLineItems(invoice)) == 0 {
-			return errors.New("at least one line item is required; use --line-* flags or provide LineItems in --body")
+			return validationError("at least one line item is required; use --line-* flags or provide LineItems in --body")
 		}
 
 		if currency, _ := cmd.Flags().GetString("currency"); strings.TrimSpace(currency) != "" {
@@ -166,26 +164,8 @@ var invoicesCreateCmd = &cobra.Command{
 		}
 		headers["content-type"] = "application/json"
 
-		client := xero.NewClient(xeroAPIBase)
 		endpoint := fmt.Sprintf("%s/Invoices", xeroAPIBase)
-		statusCode, body, err := client.Do("POST", endpoint, headers, payload)
-		if err != nil {
-			return err
-		}
-		if statusCode == 401 {
-			return errors.New("authentication failed. Please run 'xero auth login' again")
-		}
-		if statusCode < 200 || statusCode >= 300 {
-			return fmt.Errorf("API request failed with status %d: %s", statusCode, string(body))
-		}
-
-		formatted, err := prettyJSON(body)
-		if err != nil {
-			fmt.Println(string(body))
-			return nil
-		}
-		fmt.Println(formatted)
-		return nil
+		return executeMutation("POST", endpoint, headers, payload, "")
 	},
 }
 
@@ -198,6 +178,7 @@ func init() {
 	invoicesCreateCmd.Flags().String("date", "", "Invoice date in YYYY-MM-DD (defaults to today)")
 	invoicesCreateCmd.Flags().String("due-date", "", "Due date in YYYY-MM-DD (overrides --due-in)")
 	invoicesCreateCmd.Flags().Int("due-in", 7, "Number of days after the invoice date for the due date")
+	addStructuredInputFlags(invoicesCreateCmd, "Raw JSON object of invoice attributes")
 	invoicesCreateCmd.Flags().String("body", "", "Raw JSON object of invoice attributes")
 	invoicesCreateCmd.Flags().String("line-description", "", "Line item description")
 	invoicesCreateCmd.Flags().Float64("line-quantity", 0, "Line item quantity")
@@ -239,21 +220,7 @@ func resolveInvoiceDates(dateFlag, dueDateFlag string, dueIn int) (string, strin
 }
 
 func parseInvoiceBody(cmd *cobra.Command) (map[string]any, error) {
-	body, _ := cmd.Flags().GetString("body")
-	if strings.TrimSpace(body) == "" {
-		return nil, nil
-	}
-
-	var decoded any
-	if err := json.Unmarshal([]byte(body), &decoded); err != nil {
-		return nil, fmt.Errorf("invalid --body JSON: %w", err)
-	}
-
-	obj, ok := decoded.(map[string]any)
-	if !ok {
-		return nil, errors.New("--body must be a JSON object")
-	}
-	return obj, nil
+	return parseStructuredJSONObjectInput(cmd)
 }
 
 func extractContact(body map[string]any) (map[string]any, bool) {

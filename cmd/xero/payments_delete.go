@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/msmithstubbs/xero-cli/internal/auth"
-	"github.com/msmithstubbs/xero-cli/internal/xero"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +19,7 @@ var paymentsDeleteCmd = &cobra.Command{
 		}
 		paymentID := strings.TrimSpace(args[0])
 		if paymentID == "" {
-			return errors.New("payment_id is required")
+			return validationError("payment_id is required")
 		}
 
 		creds, err := auth.GetValidCredentials()
@@ -42,26 +41,8 @@ var paymentsDeleteCmd = &cobra.Command{
 			headers["Idempotency-Key"] = strings.TrimSpace(idempotency)
 		}
 
-		client := xero.NewClient(xeroAPIBase)
 		endpoint := fmt.Sprintf("%s/Payments/%s", xeroAPIBase, paymentID)
-		statusCode, body, err := client.Do("POST", endpoint, headers, payload)
-		if err != nil {
-			return err
-		}
-		if statusCode == 401 {
-			return errors.New("authentication failed. Please run 'xero auth login' again")
-		}
-		if statusCode < 200 || statusCode >= 300 {
-			return fmt.Errorf("API request failed with status %d: %s", statusCode, string(body))
-		}
-
-		formatted, err := prettyJSON(body)
-		if err != nil {
-			fmt.Println(string(body))
-			return nil
-		}
-		fmt.Println(formatted)
-		return nil
+		return executeMutation("POST", endpoint, headers, payload, "")
 	},
 }
 
