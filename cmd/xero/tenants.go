@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/msmithstubbs/xero-cli/internal/auth"
@@ -26,10 +25,14 @@ var tenantsListCmd = &cobra.Command{
 
 		connections, err := oauth.GetConnections(creds.AccessToken)
 		if err != nil {
-			return fmt.Errorf("failed to fetch tenants: %w", err)
+			return internalError("failed to fetch tenants", err)
 		}
 		if len(connections) == 0 {
-			return errors.New("no tenants found for this account")
+			return notFoundError("no tenants found for this account")
+		}
+
+		if resolvedOutputFormat() != outputTable {
+			return emitData(map[string]any{"Tenants": connections}, nil)
 		}
 
 		nameWidth := len("Tenant Name")

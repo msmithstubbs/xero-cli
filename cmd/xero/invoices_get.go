@@ -28,7 +28,9 @@ var invoicesGetCmd = &cobra.Command{
 		}
 
 		endpoint := fmt.Sprintf("%s/Invoices/%s", xeroAPIBase, invoiceID)
-		fmt.Printf("Fetching invoice %s...\n\n", invoiceID)
+		if resolvedOutputFormat() == outputTable {
+			fmt.Printf("Fetching invoice %s...\n\n", invoiceID)
+		}
 
 		headers, err := authHeaders(creds)
 		if err != nil {
@@ -38,31 +40,31 @@ var invoicesGetCmd = &cobra.Command{
 		client := xero.NewClient(xeroAPIBase)
 		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
-			return err
+			return internalError("request failed", err)
 		}
 
 		switch status {
 		case 200:
 			var payload map[string]any
 			if err := json.Unmarshal(body, &payload); err != nil {
-				return fmt.Errorf("failed to parse response: %w", err)
+				return parseResponseError(err)
 			}
 			invoices := getArray(payload, "Invoices")
 			if len(invoices) == 0 {
-				fmt.Println("Invoice not found.")
-				return nil
+				return notFoundError("invoice not found")
 			}
 			if invoice, ok := invoices[0].(map[string]any); ok {
-				displayInvoiceDetail(invoice)
-				return nil
+				return emitData(payload, func() {
+					displayInvoiceDetail(invoice)
+				})
 			}
-			return errors.New("unexpected response format")
+			return unexpectedResponseError()
 		case 401:
-			return errors.New("authentication failed. Please run 'xero auth login' again")
+			return authenticationExpiredError()
 		case 404:
-			return errors.New("invoice not found")
+			return notFoundError("invoice not found")
 		default:
-			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
+			return apiError(status, body)
 		}
 	},
 }

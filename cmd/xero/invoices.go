@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -46,8 +45,10 @@ var invoicesListCmd = &cobra.Command{
 
 		endpoint := fmt.Sprintf("%s/Invoices?%s", xeroAPIBase, params.Encode())
 
-		fmt.Println("Fetching invoices...")
-		fmt.Println()
+		if resolvedOutputFormat() == outputTable {
+			fmt.Println("Fetching invoices...")
+			fmt.Println()
+		}
 
 		headers, err := authHeaders(creds)
 		if err != nil {
@@ -57,24 +58,25 @@ var invoicesListCmd = &cobra.Command{
 		client := xero.NewClient(xeroAPIBase)
 		statusCode, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
-			return err
+			return internalError("request failed", err)
 		}
 
 		if statusCode == 401 {
-			return errors.New("authentication failed. Please run 'xero auth login' again")
+			return authenticationExpiredError()
 		}
 		if statusCode < 200 || statusCode >= 300 {
-			return fmt.Errorf("API request failed with status %d: %s", statusCode, string(body))
+			return apiError(statusCode, body)
 		}
 
 		var payload map[string]any
 		if err := json.Unmarshal(body, &payload); err != nil {
-			return fmt.Errorf("failed to parse response: %w", err)
+			return parseResponseError(err)
 		}
 
 		invoices := getArray(payload, "Invoices")
-		displayInvoices(invoices)
-		return nil
+		return emitData(payload, func() {
+			displayInvoices(invoices)
+		})
 	},
 }
 

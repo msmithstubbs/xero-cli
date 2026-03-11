@@ -32,7 +32,7 @@ var bankingTransactionsCmd = &cobra.Command{
 
 		filePath, _ := cmd.Flags().GetString("file")
 		if filePath == "" {
-			return errors.New("--file is required")
+			return validationError("--file is required")
 		}
 
 		payload, err := buildBankTransactionsPayload(filePath)
@@ -73,7 +73,7 @@ var bankingTransactionsCmd = &cobra.Command{
 		}
 
 		if status == 401 {
-			return errors.New("authentication failed. Please run 'xero auth login' again")
+			return authenticationExpiredError()
 		}
 		if status < 200 || status >= 300 {
 			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
@@ -119,8 +119,10 @@ var bankingTransactionsListCmd = &cobra.Command{
 
 		endpoint := fmt.Sprintf("%s/BankTransactions?%s", xeroAPIBase, params.Encode())
 
-		fmt.Println("Fetching bank transactions...")
-		fmt.Println()
+		if resolvedOutputFormat() == outputTable {
+			fmt.Println("Fetching bank transactions...")
+			fmt.Println()
+		}
 
 		headers, err := authHeaders(creds)
 		if err != nil {
@@ -130,24 +132,25 @@ var bankingTransactionsListCmd = &cobra.Command{
 		client := xero.NewClient(xeroAPIBase)
 		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
-			return err
+			return internalError("request failed", err)
 		}
 
 		if status == 401 {
-			return errors.New("authentication failed. Please run 'xero auth login' again")
+			return authenticationExpiredError()
 		}
 		if status < 200 || status >= 300 {
-			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
+			return apiError(status, body)
 		}
 
 		var payload map[string]any
 		if err := json.Unmarshal(body, &payload); err != nil {
-			return fmt.Errorf("failed to parse response: %w", err)
+			return parseResponseError(err)
 		}
 
 		transactions := getArray(payload, "BankTransactions")
-		displayBankTransactions(transactions)
-		return nil
+		return emitData(payload, func() {
+			displayBankTransactions(transactions)
+		})
 	},
 }
 
@@ -163,7 +166,9 @@ var bankingTransactionsGetCmd = &cobra.Command{
 		}
 
 		endpoint := fmt.Sprintf("%s/BankTransactions/%s", xeroAPIBase, transactionID)
-		fmt.Printf("Fetching bank transaction %s...\n\n", transactionID)
+		if resolvedOutputFormat() == outputTable {
+			fmt.Printf("Fetching bank transaction %s...\n\n", transactionID)
+		}
 
 		headers, err := authHeaders(creds)
 		if err != nil {
@@ -173,31 +178,31 @@ var bankingTransactionsGetCmd = &cobra.Command{
 		client := xero.NewClient(xeroAPIBase)
 		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
-			return err
+			return internalError("request failed", err)
 		}
 
 		switch status {
 		case 200:
 			var payload map[string]any
 			if err := json.Unmarshal(body, &payload); err != nil {
-				return fmt.Errorf("failed to parse response: %w", err)
+				return parseResponseError(err)
 			}
 			transactions := getArray(payload, "BankTransactions")
 			if len(transactions) == 0 {
-				fmt.Println("Bank transaction not found.")
-				return nil
+				return notFoundError("bank transaction not found")
 			}
 			if transaction, ok := transactions[0].(map[string]any); ok {
-				displayBankTransactionDetail(transaction)
-				return nil
+				return emitData(payload, func() {
+					displayBankTransactionDetail(transaction)
+				})
 			}
-			return errors.New("unexpected response format")
+			return unexpectedResponseError()
 		case 401:
-			return errors.New("authentication failed. Please run 'xero auth login' again")
+			return authenticationExpiredError()
 		case 404:
-			return errors.New("bank transaction not found")
+			return notFoundError("bank transaction not found")
 		default:
-			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
+			return apiError(status, body)
 		}
 	},
 }
@@ -215,8 +220,10 @@ var bankingListAccountsCmd = &cobra.Command{
 		params.Set("where", "Type==\"BANK\"")
 		endpoint := fmt.Sprintf("%s/Accounts?%s", xeroAPIBase, params.Encode())
 
-		fmt.Println("Fetching bank accounts...")
-		fmt.Println()
+		if resolvedOutputFormat() == outputTable {
+			fmt.Println("Fetching bank accounts...")
+			fmt.Println()
+		}
 
 		headers, err := authHeaders(creds)
 		if err != nil {
@@ -226,24 +233,25 @@ var bankingListAccountsCmd = &cobra.Command{
 		client := xero.NewClient(xeroAPIBase)
 		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
-			return err
+			return internalError("request failed", err)
 		}
 
 		if status == 401 {
-			return errors.New("authentication failed. Please run 'xero auth login' again")
+			return authenticationExpiredError()
 		}
 		if status < 200 || status >= 300 {
-			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
+			return apiError(status, body)
 		}
 
 		var payload map[string]any
 		if err := json.Unmarshal(body, &payload); err != nil {
-			return fmt.Errorf("failed to parse response: %w", err)
+			return parseResponseError(err)
 		}
 
 		accounts := getArray(payload, "Accounts")
-		displayBankAccounts(accounts)
-		return nil
+		return emitData(payload, func() {
+			displayBankAccounts(accounts)
+		})
 	},
 }
 

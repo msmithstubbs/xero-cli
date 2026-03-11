@@ -146,18 +146,17 @@ var authStatusCmd = &cobra.Command{
 			if errors.Is(err, credentials.ErrConfigAccess) {
 				fmt.Fprintln(os.Stderr, "Unable to access the tunnel config at ~/.config/zero-cli/tunnel. Check permissions and try again.")
 			}
-			return fmt.Errorf("not authenticated: %w", err)
+			return authError("not authenticated. Run 'xero auth login' first.")
 		}
-
-		fmt.Println("Authenticated")
-		fmt.Println()
 
 		accessToken := creds.AccessToken
 		if oauth.TokenExpired(creds) {
-			fmt.Println("Access token expired. Refreshing...")
+			if resolvedOutputFormat() == outputTable {
+				fmt.Println("Access token expired. Refreshing...")
+			}
 			tokenData, err := oauth.RefreshToken(creds.RefreshToken, creds.ClientID)
 			if err != nil {
-				return fmt.Errorf("failed to refresh token: %w", err)
+				return internalError("failed to refresh token", err)
 			}
 
 			creds.AccessToken = tokenData.AccessToken
@@ -173,8 +172,19 @@ var authStatusCmd = &cobra.Command{
 
 		connections, err := oauth.GetConnections(accessToken)
 		if err != nil {
-			return fmt.Errorf("failed to fetch tenants: %w", err)
+			return internalError("failed to fetch tenants", err)
 		}
+
+		if resolvedOutputFormat() != outputTable {
+			return emitData(map[string]any{
+				"Authenticated": true,
+				"Tenants":       connections,
+				"TokenExpired":  oauth.TokenExpired(creds),
+			}, nil)
+		}
+
+		fmt.Println("Authenticated")
+		fmt.Println()
 
 		fmt.Printf("Available Tenants (%d):\n", len(connections))
 		fmt.Println()

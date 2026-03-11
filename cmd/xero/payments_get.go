@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/msmithstubbs/xero-cli/internal/auth"
@@ -22,7 +21,9 @@ var paymentsGetCmd = &cobra.Command{
 		}
 
 		endpoint := fmt.Sprintf("%s/Payments/%s", xeroAPIBase, paymentID)
-		fmt.Printf("Fetching payment %s...\n\n", paymentID)
+		if resolvedOutputFormat() == outputTable {
+			fmt.Printf("Fetching payment %s...\n\n", paymentID)
+		}
 
 		headers, err := authHeaders(creds)
 		if err != nil {
@@ -32,31 +33,31 @@ var paymentsGetCmd = &cobra.Command{
 		client := xero.NewClient(xeroAPIBase)
 		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
-			return err
+			return internalError("request failed", err)
 		}
 
 		switch status {
 		case 200:
 			var payload map[string]any
 			if err := json.Unmarshal(body, &payload); err != nil {
-				return fmt.Errorf("failed to parse response: %w", err)
+				return parseResponseError(err)
 			}
 			payments := getArray(payload, "Payments")
 			if len(payments) == 0 {
-				fmt.Println("Payment not found.")
-				return nil
+				return notFoundError("payment not found")
 			}
 			if payment, ok := payments[0].(map[string]any); ok {
-				displayPaymentDetail(payment)
-				return nil
+				return emitData(payload, func() {
+					displayPaymentDetail(payment)
+				})
 			}
-			return errors.New("unexpected response format")
+			return unexpectedResponseError()
 		case 401:
-			return errors.New("authentication failed. Please run 'xero auth login' again")
+			return authenticationExpiredError()
 		case 404:
-			return errors.New("payment not found")
+			return notFoundError("payment not found")
 		default:
-			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
+			return apiError(status, body)
 		}
 	},
 }

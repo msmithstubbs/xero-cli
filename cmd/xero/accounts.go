@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 
@@ -38,8 +37,10 @@ var accountsListCmd = &cobra.Command{
 		}
 		endpoint := fmt.Sprintf("%s/Accounts?%s", xeroAPIBase, params.Encode())
 
-		fmt.Println("Fetching accounts...")
-		fmt.Println()
+		if resolvedOutputFormat() == outputTable {
+			fmt.Println("Fetching accounts...")
+			fmt.Println()
+		}
 
 		headers, err := authHeaders(creds)
 		if err != nil {
@@ -49,24 +50,25 @@ var accountsListCmd = &cobra.Command{
 		client := xero.NewClient(xeroAPIBase)
 		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
-			return err
+			return internalError("request failed", err)
 		}
 
 		if status == 401 {
-			return errors.New("authentication failed. Please run 'xero auth login' again")
+			return authenticationExpiredError()
 		}
 		if status < 200 || status >= 300 {
-			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
+			return apiError(status, body)
 		}
 
 		var payload map[string]any
 		if err := json.Unmarshal(body, &payload); err != nil {
-			return fmt.Errorf("failed to parse response: %w", err)
+			return parseResponseError(err)
 		}
 
 		accounts := getArray(payload, "Accounts")
-		displayAccounts(accounts)
-		return nil
+		return emitData(payload, func() {
+			displayAccounts(accounts)
+		})
 	},
 }
 
@@ -82,7 +84,9 @@ var accountsGetCmd = &cobra.Command{
 		}
 
 		endpoint := fmt.Sprintf("%s/Accounts/%s", xeroAPIBase, accountID)
-		fmt.Printf("Fetching account %s...\n\n", accountID)
+		if resolvedOutputFormat() == outputTable {
+			fmt.Printf("Fetching account %s...\n\n", accountID)
+		}
 
 		headers, err := authHeaders(creds)
 		if err != nil {
@@ -92,31 +96,31 @@ var accountsGetCmd = &cobra.Command{
 		client := xero.NewClient(xeroAPIBase)
 		status, body, err := client.Do("GET", endpoint, headers, nil)
 		if err != nil {
-			return err
+			return internalError("request failed", err)
 		}
 
 		switch status {
 		case 200:
 			var payload map[string]any
 			if err := json.Unmarshal(body, &payload); err != nil {
-				return fmt.Errorf("failed to parse response: %w", err)
+				return parseResponseError(err)
 			}
 			accounts := getArray(payload, "Accounts")
 			if len(accounts) == 0 {
-				fmt.Println("Account not found.")
-				return nil
+				return notFoundError("account not found")
 			}
 			if account, ok := accounts[0].(map[string]any); ok {
-				displayAccountDetail(account)
-				return nil
+				return emitData(payload, func() {
+					displayAccountDetail(account)
+				})
 			}
-			return errors.New("unexpected response format")
+			return unexpectedResponseError()
 		case 401:
-			return errors.New("authentication failed. Please run 'xero auth login' again")
+			return authenticationExpiredError()
 		case 404:
-			return errors.New("account not found")
+			return notFoundError("account not found")
 		default:
-			return fmt.Errorf("API request failed with status %d: %s", status, string(body))
+			return apiError(status, body)
 		}
 	},
 }

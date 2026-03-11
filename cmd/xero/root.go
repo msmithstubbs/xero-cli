@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -15,17 +14,23 @@ var rootCmd = &cobra.Command{
 	Long:          "A command-line interface for interacting with the Xero API, modeled after the GitHub CLI.",
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		return validateOutputFormat(outputFormat)
+	},
 }
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		writeCommandError(stderrWriter, err)
+		os.Exit(exitCodeForError(err))
 	}
 }
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&tenantOverride, "tenant-id", "", "Tenant ID to use for this request")
+	rootCmd.PersistentFlags().StringVar(&outputFormat, "output", outputAuto, "Output format: auto, table, json, jsonl")
+	rootCmd.PersistentFlags().StringVar(&fieldsFlag, "fields", "", "Comma-separated field paths to include in JSON output")
+	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Preview mutating requests without sending them")
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(invoicesCmd)
 	rootCmd.AddCommand(contactsCmd)
