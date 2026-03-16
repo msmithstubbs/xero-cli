@@ -55,3 +55,19 @@ func TestBuildCommandDescriptionMarksMutationAndInheritedFlags(t *testing.T) {
 		t.Fatal("expected inherited tenant-id flag to be described")
 	}
 }
+
+func TestBuildCommandDescriptionIncludesHTTPSProxyForNetworkCommands(t *testing.T) {
+	description := buildCommandDescription(authLoginCmd, false)
+
+	foundHTTPSProxy := false
+	for _, env := range description.EnvVars {
+		if env == "HTTPS_PROXY" {
+			foundHTTPSProxy = true
+			break
+		}
+	}
+
+	if !foundHTTPSProxy {
+		t.Fatal("expected HTTPS_PROXY to be described for network commands")
+	}
+}
