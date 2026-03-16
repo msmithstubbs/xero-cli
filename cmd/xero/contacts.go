@@ -12,8 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const xeroAPIBase = "https://api.xero.com/api.xro/2.0"
-
 var contactsCmd = &cobra.Command{
 	Use:   "contacts",
 	Short: "Manage contacts",
