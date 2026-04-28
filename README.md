@@ -115,6 +115,12 @@ XERO_CLIENT_ID=<client_id> xero auth login
 XERO_PKCE_VERIFIER=<verifier> xero auth login --no-browser
 ```
 
+Outbound HTTPS requests also honor `HTTPS_PROXY`. Provide a full proxy URL, including scheme and port, for example:
+
+```bash
+HTTPS_PROXY=http://proxy.example:8443 xero auth status
+```
+
 #### Import Credentials
 ```bash
 xero auth import \

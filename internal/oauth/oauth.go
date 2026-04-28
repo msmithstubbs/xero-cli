@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/msmithstubbs/xero-cli/internal/credentials"
+	"github.com/msmithstubbs/xero-cli/internal/httpclient"
 )
 
 const (
@@ -34,6 +35,8 @@ type Connection struct {
 	TenantID   string `json:"tenantId"`
 	TenantName string `json:"tenantName"`
 }
+
+var defaultHTTPClient = httpclient.New(30 * time.Second)
 
 func GetAuthURL(clientID, codeVerifier string) (string, error) {
 	if codeVerifier == "" {
@@ -94,7 +97,7 @@ func GetConnections(accessToken string) ([]Connection, error) {
 	req.Header.Set("authorization", "Bearer "+accessToken)
 	req.Header.Set("content-type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := defaultHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +174,7 @@ func StartCallbackServer(ctx context.Context) (*CallbackServer, error) {
 }
 
 func postForm(url string, form url.Values) (*TokenData, error) {
-	resp, err := http.PostForm(url, form)
+	resp, err := defaultHTTPClient.PostForm(url, form)
 	if err != nil {
 		return nil, err
 	}

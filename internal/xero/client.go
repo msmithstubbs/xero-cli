@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/msmithstubbs/xero-cli/internal/httpclient"
 )
 
 type Client struct {
@@ -14,10 +16,8 @@ type Client struct {
 
 func NewClient(baseURL string) *Client {
 	return &Client{
-		BaseURL: baseURL,
-		HTTPClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		BaseURL:    baseURL,
+		HTTPClient: httpclient.New(30 * time.Second),
 	}
 }
 

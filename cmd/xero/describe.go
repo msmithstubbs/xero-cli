@@ -160,7 +160,11 @@ func supportsStructuredInput(cmd *cobra.Command) bool {
 }
 
 func envVarsForCommand(cmd *cobra.Command) []string {
-	envs := make([]string, 0, 3)
+	envs := make([]string, 0, 4)
+	if supportsProxyEnv(cmd) {
+		envs = append(envs, "HTTPS_PROXY")
+	}
+
 	switch cmd.CommandPath() {
 	case "xero auth login":
 		envs = append(envs, "XERO_CLIENT_ID", "XERO_PKCE_VERIFIER")
@@ -176,4 +180,18 @@ func envVarsForCommand(cmd *cobra.Command) []string {
 	envs = append(envs, "XERO_TENANT_ID")
 	sort.Strings(envs)
 	return envs
+}
+
+func supportsProxyEnv(cmd *cobra.Command) bool {
+	switch path := cmd.CommandPath(); {
+	case path == "xero",
+		path == "xero describe",
+		strings.HasPrefix(path, "xero describe "),
+		path == "xero auth",
+		path == "xero auth import",
+		path == "xero auth logout":
+		return false
+	default:
+		return true
+	}
 }
