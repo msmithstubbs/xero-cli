@@ -7,6 +7,7 @@ import (
 )
 
 var tenantOverride string
+var xeroAPIBase = "https://api.xero.com/api.xro/2.0"
 
 var rootCmd = &cobra.Command{
 	Use:           "xero",
@@ -28,6 +29,7 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&tenantOverride, "tenant-id", "", "Tenant ID to use for this request")
+	rootCmd.PersistentFlags().StringVar(&xeroAPIBase, "base-url", xeroAPIBase, "Base URL for the Xero Accounting API (default: https://api.xero.com/api.xro/2.0)")
 	rootCmd.PersistentFlags().StringVar(&outputFormat, "output", outputAuto, "Output format: auto, table, json, jsonl")
 	rootCmd.PersistentFlags().StringVar(&fieldsFlag, "fields", "", "Comma-separated field paths to include in JSON output")
 	rootCmd.PersistentFlags().BoolVar(&redactOutput, "redact", true, "Redact sensitive fields from machine-readable output")
